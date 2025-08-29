@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-08-29
+
 ### Added
 
 - **New Commands:**
@@ -93,5 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper cleanup of git references and filesystem state
   - Cross-platform path handling and symlink resolution
 
-[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/cafreeman/worktree/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/cafreeman/worktree/releases/tag/v0.1.0
