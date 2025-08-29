@@ -1,21 +1,10 @@
 # Configuration for cargo-release
 # https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 
-# Automatic changelog updates
-[[pre-release-replacements]]
-file = "CHANGELOG.md"
-search = "## \\[Unreleased\\]"
-replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}"
-
-[[pre-release-replacements]]
-file = "CHANGELOG.md"
-search = "\\[Unreleased\\]: https://github.com/cafreeman/worktree/compare/v[0-9]+\\.[0-9]+\\.[0-9]+\\.\\.\\.HEAD"
-replace = "[Unreleased]: https://github.com/cafreeman/worktree/compare/v{{version}}...HEAD\n[{{version}}]: https://github.com/cafreeman/worktree/compare/v{{prev_version}}...v{{version}}"
-
 # Quality assurance hooks before release
 pre-release-hook = [
   "cargo fmt --check",
-  "cargo clippy --all-targets --all-features -- -D warnings",
+  "cargo clippy --all-targets --all-features -- -D warnings", 
   "cargo test",
   "cargo build --release",
 ]
@@ -39,3 +28,14 @@ publish = true
 
 # Verify the contents look right before any operations
 verify = true
+
+# Automatic changelog updates
+[[pre-release-replacements]]
+file = "CHANGELOG.md"
+search = "## \\[Unreleased\\]"
+replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}"
+
+[[pre-release-replacements]]
+file = "CHANGELOG.md"
+search = "\\[Unreleased\\]: https://github.com/cafreeman/worktree/compare/v[0-9]+\\.[0-9]+\\.[0-9]+\\.\\.\\.HEAD"
+replace = "[Unreleased]: https://github.com/cafreeman/worktree/compare/v{{version}}...HEAD\n[{{version}}]: https://github.com/cafreeman/worktree/compare/v{{prev_version}}...v{{version}}"
