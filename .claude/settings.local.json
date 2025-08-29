@@ -4,7 +4,8 @@
       "WebFetch(domain:docs.rs)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:stackoverflow.com)",
-      "WebFetch(domain:blog.gitbutler.com)"
+      "WebFetch(domain:blog.gitbutler.com)",
+      "WebFetch(domain:crates.io)"
     ],
     "deny": [],
     "ask": []

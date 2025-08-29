@@ -1,9 +1,8 @@
-use anyhow::Result;
 use clap::{Command, ValueEnum};
 use clap_complete::{generate, Shell as CompleteShell};
 use std::io;
 
-#[derive(ValueEnum, Clone)]
+#[derive(ValueEnum, Clone, Copy)]
 pub enum Shell {
     Bash,
     Zsh,
@@ -11,23 +10,16 @@ pub enum Shell {
 }
 
 /// Generate shell integration for the specified shell
-///
-/// # Errors
-/// Returns an error if shell generation fails
-pub fn generate_shell_integration(shell: Shell) -> Result<()> {
+pub fn generate_shell_integration(shell: Shell) {
     match shell {
         Shell::Bash => print_bash_integration(),
         Shell::Zsh => print_zsh_integration(),
         Shell::Fish => print_fish_integration(),
     }
-    Ok(())
 }
 
 /// Generate native shell completions using clap
-///
-/// # Errors
-/// Returns an error if completion generation fails
-pub fn generate_completions(shell: Shell, cmd: &mut Command) -> Result<()> {
+pub fn generate_completions(shell: Shell, cmd: &mut Command) {
     let clap_shell = match shell {
         Shell::Bash => CompleteShell::Bash,
         Shell::Zsh => CompleteShell::Zsh,
@@ -35,7 +27,6 @@ pub fn generate_completions(shell: Shell, cmd: &mut Command) -> Result<()> {
     };
     
     generate(clap_shell, cmd, cmd.get_name().to_string(), &mut io::stdout());
-    Ok(())
 }
 
 

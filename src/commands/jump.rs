@@ -14,7 +14,7 @@ use crate::storage::WorktreeStorage;
 /// - Git operations fail
 /// - Interactive selection fails
 pub fn jump_worktree(
-    target: Option<String>,
+    target: Option<&str>,
     interactive: bool,
     list_completions: bool,
     current_repo_only: bool,
@@ -28,8 +28,11 @@ pub fn jump_worktree(
 
     let target_path = if interactive || target.is_none() {
         select_worktree_interactive(&storage, current_repo_only)?
+    } else if let Some(target_name) = target {
+        find_worktree_by_name(&storage, target_name, current_repo_only)?
     } else {
-        find_worktree_by_name(&storage, &target.unwrap(), current_repo_only)?
+        // This should never happen given the condition above, but we need to handle it
+        anyhow::bail!("No target specified for worktree jump");
     };
 
     // Output just the path (shell function will handle cd)

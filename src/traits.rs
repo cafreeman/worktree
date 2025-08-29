@@ -46,4 +46,13 @@ pub trait GitOperations {
     /// - Branch doesn't exist
     /// - Git operations fail
     fn delete_branch(&self, branch_name: &str) -> Result<()>;
+
+    /// Enables worktree-specific configuration and copies parent repo's effective config
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to enable worktree configuration
+    /// - Failed to read parent repository configuration
+    /// - Failed to set worktree-specific configuration
+    fn inherit_config(&self, worktree_path: &Path) -> Result<()>;
 }

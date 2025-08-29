@@ -72,6 +72,15 @@ fn create_worktree_internal(
 
     git_repo.create_worktree(branch, &worktree_path, create_branch)?;
 
+    // Inherit git configuration from parent repository
+    println!("Inheriting git configuration from parent repository...");
+    if let Err(e) = git_repo.inherit_config(&worktree_path) {
+        eprintln!("Warning: Failed to inherit git config: {}", e);
+        eprintln!("Worktree will use default git configuration.");
+    } else {
+        println!("✓ Git configuration inherited successfully");
+    }
+
     // Store branch mapping if using default storage location
     if custom_path.is_none() {
         let sanitized_name = worktree_path

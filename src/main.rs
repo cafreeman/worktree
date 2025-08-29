@@ -107,7 +107,7 @@ fn main() -> Result<()> {
             sync_config::sync_config(&from, &to)?;
         }
         Commands::Init { shell } => {
-            init::generate_shell_integration(shell)?;
+            init::generate_shell_integration(shell);
         }
         Commands::Jump {
             target,
@@ -115,11 +115,11 @@ fn main() -> Result<()> {
             list_completions,
             current,
         } => {
-            jump::jump_worktree(target, interactive, list_completions, current)?;
+            jump::jump_worktree(target.as_deref(), interactive, list_completions, current)?;
         }
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
-            init::generate_completions(shell, &mut cmd)?;
+            init::generate_completions(shell, &mut cmd);
         }
     }
 

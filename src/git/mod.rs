@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use git2::{BranchType, Repository};
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 use crate::traits::GitOperations;
 
@@ -105,6 +106,162 @@ impl GitRepo {
         branch.delete()?;
         Ok(())
     }
+
+    /// Enables worktree-specific configuration and copies parent repo's effective config
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to enable worktree configuration
+    /// - Failed to read parent repository configuration
+    /// - Failed to set worktree-specific configuration
+    pub fn inherit_config(&self, worktree_path: &Path) -> Result<()> {
+        // First, enable worktree-specific configuration for the main repository
+        let mut main_config = self.repo.config()
+            .context("Failed to get repository config")?;
+        main_config.set_bool("extensions.worktreeConfig", true)
+            .context("Failed to enable worktree config extension")?;
+
+        // Open the worktree repository to set its config
+        let worktree_repo = Repository::open(worktree_path)
+            .context("Failed to open worktree repository")?;
+
+        // Get the effective config from the parent repository (includes conditional includes)
+        let parent_config = self.get_effective_config()
+            .context("Failed to read parent repository config")?;
+
+        // Set worktree-specific configuration
+        let mut worktree_config = worktree_repo.config()
+            .context("Failed to get worktree config")?;
+
+        // Copy relevant configuration keys to the worktree
+        for (key, config_value) in parent_config {
+            if should_inherit_config_key(&key) {
+                match config_value {
+                    ConfigValue::String(s) => {
+                        if let Err(e) = worktree_config.set_str(&key, &s) {
+                            eprintln!("Warning: Failed to set config {}: {}", key, e);
+                        }
+                    }
+                    ConfigValue::Bool(b) => {
+                        if let Err(e) = worktree_config.set_bool(&key, b) {
+                            eprintln!("Warning: Failed to set config {}: {}", key, e);
+                        }
+                    }
+                    ConfigValue::Int(i) => {
+                        if let Err(e) = worktree_config.set_i64(&key, i) {
+                            eprintln!("Warning: Failed to set config {}: {}", key, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Reads the effective configuration from the parent repository
+    fn get_effective_config(&self) -> Result<HashMap<String, ConfigValue>> {
+        let mut config = self.repo.config()
+            .context("Failed to get repository config")?;
+        
+        let mut config_map = HashMap::new();
+        
+        // Get a snapshot of the current config which includes all effective values
+        let snapshot = config.snapshot()
+            .context("Failed to create config snapshot")?;
+
+        let mut entries = snapshot.entries(None)
+            .context("Failed to get config entries")?;
+
+        while let Some(entry_result) = entries.next() {
+            if let Ok(entry) = entry_result {
+                if let Some(name) = entry.name() {
+                    let key = name.to_string();
+                    
+                    if let Some(value_str) = entry.value() {
+                        // Try to determine the type and parse accordingly
+                        let config_value = if let Ok(bool_val) = config.get_bool(&key) {
+                            ConfigValue::Bool(bool_val)
+                        } else if let Ok(int_val) = config.get_i64(&key) {
+                            ConfigValue::Int(int_val)
+                        } else {
+                            ConfigValue::String(value_str.to_string())
+                        };
+                        
+                        config_map.insert(key, config_value);
+                    }
+                }
+            }
+        }
+
+        Ok(config_map)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ConfigValue {
+    String(String),
+    Bool(bool),
+    Int(i64),
+}
+
+/// Determines which configuration keys should be inherited by worktrees
+fn should_inherit_config_key(key: &str) -> bool {
+    // Don't inherit keys that are specific to the main repository
+    const EXCLUDED_KEYS: &[&str] = &[
+        "core.bare",
+        "core.worktree",
+        "core.repositoryformatversion",
+        "extensions.worktreeconfig",
+    ];
+
+    // Don't inherit keys that start with excluded prefixes
+    const EXCLUDED_PREFIXES: &[&str] = &[
+        "branch.",
+        "remote.",
+        "submodule.",
+    ];
+
+    // Include keys that are typically user-specific and should be inherited
+    const INCLUDED_PREFIXES: &[&str] = &[
+        "user.",
+        "commit.",
+        "gpg.",
+        "credential.",
+        "push.",
+        "pull.",
+        "merge.",
+        "diff.",
+        "log.",
+        "color.",
+        "core.editor",
+        "core.pager",
+        "core.autocrlf",
+        "core.filemode",
+        "init.defaultbranch",
+    ];
+
+    // Check if key should be excluded
+    if EXCLUDED_KEYS.contains(&key) {
+        return false;
+    }
+
+    if EXCLUDED_PREFIXES.iter().any(|prefix| key.starts_with(prefix)) {
+        return false;
+    }
+
+    // Include if it matches an included prefix
+    if INCLUDED_PREFIXES.iter().any(|prefix| key.starts_with(prefix)) {
+        return true;
+    }
+
+    // For core.* keys, only include specific ones
+    if key.starts_with("core.") {
+        return INCLUDED_PREFIXES.iter().any(|prefix| key == prefix.trim_end_matches('.'));
+    }
+
+    // Default to not inheriting unknown keys
+    false
 }
 
 impl GitOperations for GitRepo {
@@ -140,5 +297,9 @@ impl GitOperations for GitRepo {
 
     fn delete_branch(&self, branch_name: &str) -> Result<()> {
         self.delete_branch(branch_name)
+    }
+
+    fn inherit_config(&self, worktree_path: &Path) -> Result<()> {
+        self.inherit_config(worktree_path)
     }
 }
