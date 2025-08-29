@@ -1,0 +1,43 @@
+# Clippy configuration file for advanced settings
+# This supplements the lint levels defined in Cargo.toml
+
+# Minimum Supported Rust Version (MSRV)
+# Adjust this based on your project's requirements
+msrv = "1.70.0"
+
+# Avoid breaking exported API
+avoid-breaking-exported-api = false
+
+# Disallowed names (extend defaults with custom additions)
+# Default list typically includes ["foo", "baz", "quux"]
+disallowed-names = ["tmp", "temp", "..", "data", "value"]
+
+# Maximum allowed cognitive complexity
+cognitive-complexity-threshold = 30
+
+# Enforce specific documentation style
+# doc-valid-idents = ["GitHub", "GitLab", "JavaScript", "TypeScript"]
+
+# Enum variant size threshold
+enum-variant-size-threshold = 512
+
+# Function length threshold
+too-many-lines-threshold = 100
+
+# Type complexity threshold
+type-complexity-threshold = 250
+
+# Trivially copy passable size threshold
+trivial-copy-size-limit = 256
+
+# Allow certain unsafe operations if needed
+# allow-unsafe-code = false
+
+# Single character binding names to allow
+single-char-binding-names-threshold = 4
+
+# Literal representation threshold
+literal-representation-threshold = 10
+
+# Stack size threshold for large stack arrays
+stack-size-threshold = 512000

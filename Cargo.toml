@@ -15,3 +15,30 @@ glob = "0.3"
 [dev-dependencies]
 tempfile = "3.8"
 temp-env = "0.3"
+
+[lints.clippy]
+# Deny common footguns that can cause runtime panics
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
+todo = "warn"
+unimplemented = "warn"
+
+# Performance and efficiency
+inefficient_to_string = "warn"
+clone_on_ref_ptr = "warn"
+large_enum_variant = "warn"
+
+# Code quality and style
+redundant_closure_for_method_calls = "warn"
+manual_let_else = "warn"
+unnecessary_wraps = "warn"
+unused_self = "warn"
+
+# Documentation
+missing_docs_in_private_items = "allow" # Can be strict, but often too noisy
+missing_errors_doc = "warn"
+
+# Pedantic lints (selective)
+must_use_candidate = "warn"
+needless_pass_by_value = "warn"
