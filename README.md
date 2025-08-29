@@ -10,7 +10,7 @@ A powerful CLI tool that transforms git worktree management from painful to effo
 
 - ⚡ **Zero Setup Friction** - Create worktrees anywhere in your project with one command
 - 🏠 **Centralized & Organized** - All worktrees live in `~/.worktrees/<repo>/<branch>/` - no more scattered directories
-- 🔄 **Config Sync Magic** - Your `.env`, `.vscode/`, and local config files automatically follow you to new worktrees  
+- 🔄 **Config Sync Magic** - Your `.env`, `.vscode/`, and local config files automatically follow you to new worktrees
 - 🧭 **Effortless Navigation** - Jump between worktrees instantly with smart completions and interactive selection
 - 🔙 **Quick Return** - Navigate back to original repo from any worktree with `worktree back`
 - 🧹 **Self-Cleaning** - Automatically cleans up orphaned branches and references to prevent git clutter
@@ -19,19 +19,16 @@ A powerful CLI tool that transforms git worktree management from painful to effo
 
 ## Installation
 
-### 1. Build and Install the Binary
+> **⚠️ Important:** This tool requires shell integration to function properly. The `worktree jump` and `worktree back` commands won't work without it, and you'll miss out on intelligent tab completions. Make sure to complete both installation steps below.
+
+### 1. Install from crates.io
 
 ```bash
-# Clone and build the project
-git clone https://github.com/cafreeman/worktree.git
-cd worktree
-cargo build --release
-
-# Install the binary (choose one option)
-sudo cp target/release/worktree-bin /usr/local/bin/
-# OR add to your PATH
-cp target/release/worktree-bin ~/.local/bin/  # ensure ~/.local/bin is in PATH
+# Install the latest version from crates.io
+cargo install worktree
 ```
+
+This will install the `worktree-bin` binary to your cargo bin directory (typically `~/.cargo/bin/`). Make sure this directory is in your PATH.
 
 ### 2. Set Up Shell Integration with Completions
 
@@ -69,17 +66,20 @@ worktree-bin init fish | source
 **Note:** The shell integration provides sophisticated tab completions that enhance your workflow:
 
 **Command & Flag Completion:**
+
 - All subcommands (`create`, `list`, `jump`, etc.) with intelligent suggestions
 - All flags and options with descriptions (powered by clap)
 - Context-aware completion based on your current command
 
 **Dynamic Worktree Completion:**
+
 - Live completion of worktree names for `worktree jump`
 - Fuzzy matching - type partial names and get suggestions
 - Pressing TAB on empty `worktree jump` triggers interactive selection
 - Completion respects `--current` flag to show only current repository worktrees
 
 **Smart Navigation:**
+
 - Shell integration enables `worktree jump` and `worktree back` to actually change directories
 - All other commands are delegated to the binary while maintaining completion support
 
@@ -138,18 +138,18 @@ worktree remove feature/payments --keep-branch
 
 ## Commands
 
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `create <branch>` | Create a new worktree | `--new-branch`, `--existing-branch` |
-| `list` | List all worktrees | `--current` |
-| `remove <target>` | Remove a worktree | `--keep-branch` |
-| `status` | Show worktree status | - |
-| `sync-config <from> <to>` | Sync config files between worktrees | - |
-| `jump [target]` | Navigate to a worktree directory | `--interactive`, `--current` |
-| `back` | Navigate back to original repository | - |
-| `cleanup` | Clean up orphaned branches and references | - |
-| `completions <shell>` | Generate shell completions | - |
-| `init <shell>` | Generate shell integration | - |
+| Command                   | Description                               | Key Options                         |
+| ------------------------- | ----------------------------------------- | ----------------------------------- |
+| `create <branch>`         | Create a new worktree                     | `--new-branch`, `--existing-branch` |
+| `list`                    | List all worktrees                        | `--current`                         |
+| `remove <target>`         | Remove a worktree                         | `--keep-branch`                     |
+| `status`                  | Show worktree status                      | -                                   |
+| `sync-config <from> <to>` | Sync config files between worktrees       | -                                   |
+| `jump [target]`           | Navigate to a worktree directory          | `--interactive`, `--current`        |
+| `back`                    | Navigate back to original repository      | -                                   |
+| `cleanup`                 | Clean up orphaned branches and references | -                                   |
+| `completions <shell>`     | Generate shell completions                | -                                   |
+| `init <shell>`            | Generate shell integration                | -                                   |
 
 ### `create` - Create a new worktree
 
@@ -278,8 +278,9 @@ worktree cleanup
 ```
 
 Automatically cleans up your workspace by:
+
 - Removing git branches that have no corresponding worktree directory
-- Cleaning up branch mappings for non-existent worktrees  
+- Cleaning up branch mappings for non-existent worktrees
 - Removing git worktree references that point to non-existent directories
 
 This command is useful when worktrees get out of sync due to manual deletion or filesystem issues.
@@ -315,6 +316,7 @@ worktree completions <SHELL>
 Generates native shell completions for the specified shell. This is separate from the integrated completions provided by `worktree init`.
 
 **Options:**
+
 - `<SHELL>` - Shell to generate completions for (bash, zsh, fish)
 
 **Examples:**
@@ -323,7 +325,7 @@ Generates native shell completions for the specified shell. This is separate fro
 # Generate completions for bash
 worktree completions bash > /usr/local/etc/bash_completion.d/worktree
 
-# Generate completions for zsh  
+# Generate completions for zsh
 worktree completions zsh > ~/.local/share/zsh/site-functions/_worktree
 ```
 
@@ -422,7 +424,7 @@ worktree remove feature/payments
 ```bash
 # Work on multiple features simultaneously
 worktree create --new-branch feature/auth
-worktree create --new-branch feature/dashboard  
+worktree create --new-branch feature/dashboard
 worktree create bugfix/critical-issue
 
 # Jump between them effortlessly
@@ -493,6 +495,7 @@ worktree status   # Verify everything is clean
 **Problem:** Tab completion for `worktree jump` doesn't show worktree names.
 
 **Solutions:**
+
 1. Ensure shell integration is set up (see above)
 2. Check that `worktree-bin` is in your PATH
 3. Restart your shell after setup
@@ -502,6 +505,7 @@ worktree status   # Verify everything is clean
 **Problem:** Your `.env` or config files aren't appearing in new worktrees.
 
 **Solutions:**
+
 1. Check `.worktree-config.toml` syntax in your repo root
 2. Verify file patterns match your files (use `*` for wildcards)
 3. Ensure files aren't excluded by exclude patterns
@@ -518,6 +522,7 @@ worktree create --new-branch test-config
 **Problem:** Cannot create or access worktree directories.
 
 **Solutions:**
+
 ```bash
 # Ensure worktree directory is writable
 chmod -R u+w ~/.worktrees/

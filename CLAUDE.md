@@ -85,4 +85,37 @@ Strict linting is enforced with:
 - MSRV set to 1.70.0
 
 The codebase prioritizes safety, error handling, and maintainability with comprehensive error documentation and trait-based design for testability.
+
+## Release Management
+
+### cargo-release Setup
+The project uses `cargo-release` for automated version management and release preparation. Configuration is in `release.toml`.
+
+**IMPORTANT:** The release configuration is set to NEVER auto-publish. All releases must be done manually by the maintainer.
+
+### Release Workflow
+1. **Version Bumping**: Use `cargo release <level>` where level is `patch`, `minor`, or `major`
+2. **Manual Publishing**: After version bump, manually run `cargo publish` if desired
+3. **Changelog**: Update `CHANGELOG.md` following Keep a Changelog format
+
+### Safety Features
+- Manual initiation only - releases must be explicitly triggered by maintainer
+- Pre-release hooks run quality checks (fmt, clippy, test, build)
+- Automatic git tagging and pushing
+- Automatic publishing to crates.io once initiated
+
+### Release Process
+When ready to publish a new version:
+```bash
+# Update CHANGELOG.md first, then run:
+cargo release patch  # or minor/major
+
+# This will automatically:
+# 1. Update version in Cargo.toml
+# 2. Run quality checks (fmt, clippy, test, build)  
+# 3. Create release commit and git tag
+# 4. Push to git remote
+# 5. Publish to crates.io
+```
 - Clean up any stray files, directories, or git branches that you create while testing
+- Never release this package on your own
