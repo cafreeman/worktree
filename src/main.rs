@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use worktree::commands::init::Shell;
-use worktree::commands::{cleanup, create, init, jump, list, remove, status, sync_config};
+use worktree::commands::{back, cleanup, create, init, jump, list, remove, status, sync_config};
 use worktree::Result;
 
 #[derive(Parser)]
@@ -18,9 +18,6 @@ enum Commands {
         /// Branch name for the worktree
         #[arg(value_hint = ValueHint::Other)]
         branch: String,
-        /// Custom path for the worktree (optional)
-        #[arg(short, long, value_hint = ValueHint::DirPath)]
-        path: Option<String>,
         /// Force creation of a new branch (fail if it already exists)
         #[arg(long, conflicts_with = "existing_branch")]
         new_branch: bool,
@@ -83,6 +80,8 @@ enum Commands {
     },
     /// Clean up orphaned branches and worktree references
     Cleanup,
+    /// Navigate back to the original repository
+    Back,
 }
 
 fn main() -> Result<()> {
@@ -91,7 +90,6 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Create {
             branch,
-            path,
             new_branch,
             existing_branch,
         } => {
@@ -102,7 +100,7 @@ fn main() -> Result<()> {
             } else {
                 create::CreateMode::Smart
             };
-            create::create_worktree(&branch, path.as_deref(), mode)?;
+            create::create_worktree(&branch, mode)?;
         }
         Commands::List { current } => {
             list::list_worktrees(current)?;
@@ -136,6 +134,9 @@ fn main() -> Result<()> {
         }
         Commands::Cleanup => {
             cleanup::cleanup_worktrees()?;
+        }
+        Commands::Back => {
+            back::back_to_origin()?;
         }
     }
 

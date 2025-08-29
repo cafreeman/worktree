@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use std::fs;
-use std::path::Path;
 
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
@@ -44,6 +43,11 @@ pub fn remove_worktree(target: &str, delete_branch: bool) -> Result<()> {
         fs::remove_dir_all(&worktree_path).context("Failed to remove worktree directory")?;
     }
 
+    // Clean up origin information
+    if let Err(e) = storage.remove_worktree_origin(&repo_name, &branch_name) {
+        println!("⚠ Warning: Failed to clean up origin information: {}", e);
+    }
+
     if delete_branch {
         println!("Deleting branch: {}", branch_name);
         match git_repo.delete_branch(&branch_name) {
@@ -62,23 +66,6 @@ fn resolve_target(
     storage: &WorktreeStorage,
     repo_name: &str,
 ) -> Result<(std::path::PathBuf, String)> {
-    let target_path = Path::new(target);
-
-    // If it's an absolute path that exists, use it directly
-    if target_path.is_absolute() && target_path.exists() {
-        let sanitized_name = target_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .context("Could not determine branch name from path")?;
-
-        // Try to get the original branch name from mapping
-        let original_branch = storage
-            .get_original_branch_name(repo_name, sanitized_name)?
-            .unwrap_or_else(|| sanitized_name.to_string());
-
-        return Ok((target_path.to_path_buf(), original_branch));
-    }
-
     // Try target as original branch name first
     let worktree_path = storage.get_worktree_path(repo_name, target);
     if worktree_path.exists() {

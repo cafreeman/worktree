@@ -26,8 +26,8 @@ fn test_list_worktrees_with_content() -> Result<()> {
 
     env.run_test(|| {
         // Create some worktrees first
-        create::create_worktree("feature/test1", None, CreateMode::Smart)?;
-        create::create_worktree("feature/test2", None, CreateMode::Smart)?;
+        create::create_worktree("feature/test1", CreateMode::Smart)?;
+        create::create_worktree("feature/test2", CreateMode::Smart)?;
 
         // Test listing all worktrees
         list::list_worktrees(false)?;
@@ -51,7 +51,7 @@ fn test_list_worktrees_mixed_states() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree
-        create::create_worktree("feature/active", None, CreateMode::Smart)?;
+        create::create_worktree("feature/active", CreateMode::Smart)?;
 
         let worktree_path = env.storage_root.join("test_repo").join("feature-active");
         assert!(worktree_path.exists());
@@ -67,26 +67,3 @@ fn test_list_worktrees_mixed_states() -> Result<()> {
     })
 }
 
-#[test]
-fn test_list_worktrees_custom_paths() -> Result<()> {
-    let env = TestEnvironment::new()?;
-    let custom_path = env.temp_dir.path().join("custom_worktree");
-
-    env.run_test(|| {
-        // Create a worktree with custom path (not managed)
-        create::create_worktree(
-            "feature/custom",
-            Some(custom_path.to_str().unwrap()),
-            CreateMode::Smart,
-        )?;
-        assert!(custom_path.exists());
-
-        // Create a regular managed worktree
-        create::create_worktree("feature/managed", None, CreateMode::Smart)?;
-
-        // List should work and show the managed worktree
-        list::list_worktrees(true)?;
-
-        Ok(())
-    })
-}

@@ -25,10 +25,10 @@ pub enum CreateMode {
 /// - The branch exists and mode is NewBranch
 /// - Failed to create the worktree directory
 /// - Git operations fail
-pub fn create_worktree(branch: &str, custom_path: Option<&str>, mode: CreateMode) -> Result<()> {
+pub fn create_worktree(branch: &str, mode: CreateMode) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    create_worktree_internal(&git_repo, branch, custom_path, mode)
+    create_worktree_internal(&git_repo, branch, mode)
 }
 
 /// Test version that accepts a mock git repository
@@ -42,26 +42,20 @@ pub fn create_worktree(branch: &str, custom_path: Option<&str>, mode: CreateMode
 pub fn create_worktree_with_git(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
-    custom_path: Option<&str>,
     mode: CreateMode,
 ) -> Result<()> {
-    create_worktree_internal(git_repo, branch, custom_path, mode)
+    create_worktree_internal(git_repo, branch, mode)
 }
 
 fn create_worktree_internal(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
-    custom_path: Option<&str>,
     mode: CreateMode,
 ) -> Result<()> {
     let repo_path = git_repo.get_repo_path();
     let storage = WorktreeStorage::new()?;
     let repo_name = WorktreeStorage::get_repo_name(&repo_path)?;
-    let worktree_path = if let Some(path) = custom_path {
-        Path::new(path).to_path_buf()
-    } else {
-        storage.get_worktree_path(&repo_name, branch)
-    };
+    let worktree_path = storage.get_worktree_path(&repo_name, branch);
 
     // Pre-flight checks
     if worktree_path.exists() {
@@ -125,17 +119,18 @@ fn create_worktree_internal(
         println!("✓ Git configuration inherited successfully");
     }
 
-    // Store branch mapping if using default storage location
-    if custom_path.is_none() {
-        let sanitized_name = worktree_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or(branch);
-        storage.store_branch_mapping(&repo_name, branch, sanitized_name)?;
-    }
+    // Store branch mapping
+    let sanitized_name = worktree_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(branch);
+    storage.store_branch_mapping(&repo_name, branch, sanitized_name)?;
 
     let config = WorktreeConfig::load_from_repo(&repo_path)?;
     copy_config_files(&repo_path, &worktree_path, &config)?;
+
+    // Store origin information for back navigation
+    store_origin_info(&storage, &repo_name, branch, &repo_path)?;
 
     println!("✓ Worktree created successfully!");
     println!("  Branch: {}", branch);
@@ -240,5 +235,27 @@ fn copy_dir_recursive(source: &Path, target: &Path) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+/// Stores the origin repository path in storage metadata for back navigation
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to store the origin mapping
+/// - Failed to canonicalize the repository path
+fn store_origin_info(
+    storage: &WorktreeStorage,
+    repo_name: &str,
+    branch_name: &str,
+    repo_path: &Path,
+) -> Result<()> {
+    // Store the canonical path to the repository
+    let canonical_repo_path = repo_path.canonicalize()
+        .with_context(|| format!("Failed to canonicalize repository path: {}", repo_path.display()))?;
+    
+    storage.store_worktree_origin(repo_name, branch_name, &canonical_repo_path.to_string_lossy())
+        .context("Failed to store worktree origin information")?;
+    
     Ok(())
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Rust CLI application called "worktree" that manages git worktrees with enhanced features including centralized storage, automatic config file synchronization, and intelligent branch management. The binary is named `worktree-bin` and includes shell integration for directory navigation.
+This is a Rust CLI application called "worktree" that manages git worktrees with enhanced features including centralized storage in `~/.worktrees/`, automatic config file synchronization, intelligent branch management, and back navigation. The binary is named `worktree-bin` and includes shell integration for directory navigation.
 
 ## Development Commands
 
@@ -52,24 +52,25 @@ cargo run -- <command>
 ### Module Structure
 - **main.rs**: CLI entry point using clap for argument parsing, dispatches to command modules
 - **lib.rs**: Library crate root, exposes all modules and the main `Result` type from anyhow
-- **commands/**: Individual command implementations (create, list, remove, status, sync_config, init, jump)
-- **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<branch>/` with branch name sanitization and mapping
+- **commands/**: Individual command implementations (create, list, remove, status, sync_config, init, jump, back)
+- **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<branch>/` with branch name sanitization, mapping, and origin tracking
 - **config/**: Handles `.worktree-config.toml` files for customizing file copy patterns
 - **git/**: Git operations wrapper using git2 crate, implements GitOperations trait
 - **traits.rs**: Defines GitOperations trait for testability and abstraction
 
 ### Key Design Patterns
 - **Trait-based abstraction**: GitOperations trait enables mocking for tests
-- **Centralized storage**: All worktrees stored under `~/.worktrees/` with predictable structure
+- **Centralized storage**: All worktrees stored under `~/.worktrees/` with predictable structure (no custom paths)
 - **Branch name sanitization**: Converts `feature/auth` to `feature-auth` for filesystem compatibility, maintains mapping
 - **Configuration-driven file copying**: Uses glob patterns from `.worktree-config.toml` or sensible defaults
+- **Origin tracking**: Stores origin repository paths for back navigation in `.worktree-origins` metadata files
 - **Shell integration**: Generates shell functions for directory navigation and completions
 
 ### Core Components
-- **WorktreeStorage**: Manages the `~/.worktrees/` directory structure and branch name mapping
+- **WorktreeStorage**: Manages the `~/.worktrees/` directory structure, branch name mapping, and origin tracking
 - **WorktreeConfig**: Loads and manages copy patterns from `.worktree-config.toml`
 - **GitRepo**: Wraps git2 operations for worktree management
-- **Shell Integration**: Generates bash/zsh/fish functions for `worktree` command wrapper
+- **Shell Integration**: Generates bash/zsh/fish functions for `worktree` command wrapper with `jump` and `back` navigation
 
 ### Testing
 - Unit tests in `tests/` directory with comprehensive coverage

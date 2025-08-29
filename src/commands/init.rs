@@ -57,6 +57,14 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
+        back)
+            # Handle back specially - call rust binary and cd to result
+            local result
+            result=$(worktree-bin back)
+            if [ -n "$result" ]; then
+                cd "$result" || return 1
+            fi
+            ;;
         *)
             # Delegate everything else to the rust binary
             worktree-bin "$@"
@@ -108,7 +116,7 @@ _worktree_complete() {{
             COMP_WORDS=("${{saved_comp_words[@]}}")
         else
             # Fallback to basic completion
-            COMPREPLY=($(compgen -W "create list remove status sync-config jump init completions cleanup --help --version" -- "$cur"))
+            COMPREPLY=($(compgen -W "create list remove status sync-config jump back init completions cleanup --help --version" -- "$cur"))
         fi
     fi
 }}
@@ -136,6 +144,14 @@ worktree() {{
                 result=$(worktree-bin jump "$@")
             fi
 
+            if [ -n "$result" ]; then
+                cd "$result" || return 1
+            fi
+            ;;
+        back)
+            # Handle back specially - call rust binary and cd to result
+            local result
+            result=$(worktree-bin back)
             if [ -n "$result" ]; then
                 cd "$result" || return 1
             fi
@@ -217,6 +233,7 @@ _worktree() {{
                         'status:Show worktree status'
                         'sync-config:Sync config files between worktrees'
                         'jump:Jump to a worktree directory'
+                        'back:Navigate back to the original repository'
                         'init:Generate shell integration'
                         'completions:Generate shell completions'
                         'cleanup:Clean up orphaned branches and worktree references'
@@ -255,6 +272,12 @@ function worktree
                 set result (worktree-bin jump $argv)
             end
 
+            if test -n "$result"
+                cd "$result"
+            end
+        case back
+            # Handle back specially - call rust binary and cd to result
+            set result (worktree-bin back)
             if test -n "$result"
                 cd "$result"
             end

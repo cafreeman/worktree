@@ -91,7 +91,7 @@ fn test_create_worktree_simple() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree (smart mode will create the branch since it doesn't exist)
-        create::create_worktree("feature/test", None, CreateMode::Smart)?;
+        create::create_worktree("feature/test", CreateMode::Smart)?;
 
         // Verify real files were created
         let worktree_path = env.storage_root.join("test_repo").join("feature-test");
@@ -108,28 +108,6 @@ fn test_create_worktree_simple() -> Result<()> {
     })
 }
 
-#[test]
-fn test_create_worktree_custom_path() -> Result<()> {
-    let env = TestEnvironment::new()?;
-    let custom_path = env.temp_dir.path().join("custom_location");
-
-    env.run_test(|| {
-        create::create_worktree(
-            "feature/test",
-            Some(custom_path.to_str().unwrap()),
-            CreateMode::Smart,
-        )?;
-
-        // Custom path should exist
-        assert!(custom_path.exists());
-
-        // No branch mapping for custom paths
-        let mapping_file = env.storage_root.join("test_repo").join(".branch-mapping");
-        assert!(!mapping_file.exists());
-
-        Ok(())
-    })
-}
 
 #[test]
 fn test_create_worktree_path_exists() -> Result<()> {
@@ -140,7 +118,7 @@ fn test_create_worktree_path_exists() -> Result<()> {
         let worktree_path = env.storage_root.join("test_repo").join("feature-test");
         std::fs::create_dir_all(&worktree_path)?;
 
-        let result = create::create_worktree("feature/test", None, CreateMode::Smart);
+        let result = create::create_worktree("feature/test", CreateMode::Smart);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
 
@@ -156,7 +134,7 @@ fn test_config_inheritance_is_called() -> Result<()> {
         let mock_git = MockGitRepo::new(env.repo_path.clone());
 
         // Test that config inheritance is called during worktree creation
-        create::create_worktree_with_git(&mock_git, "feature/test", None, CreateMode::Smart)?;
+        create::create_worktree_with_git(&mock_git, "feature/test", CreateMode::Smart)?;
 
         // Verify that inherit_config was called
         assert!(
@@ -185,7 +163,7 @@ fn test_config_inheritance_with_real_git() -> Result<()> {
             .output()?;
 
         // Create a worktree (this will use real GitRepo and config inheritance)
-        create::create_worktree("feature/config-test", None, CreateMode::Smart)?;
+        create::create_worktree("feature/config-test", CreateMode::Smart)?;
 
         let worktree_path = env
             .storage_root

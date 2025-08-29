@@ -14,8 +14,8 @@ fn test_sync_config_between_worktrees() -> Result<()> {
 
     env.run_test(|| {
         // Create source and target worktrees
-        create::create_worktree("feature/source", None, CreateMode::Smart)?;
-        create::create_worktree("feature/target", None, CreateMode::Smart)?;
+        create::create_worktree("feature/source", CreateMode::Smart)?;
+        create::create_worktree("feature/target", CreateMode::Smart)?;
 
         let source_path = env.storage_root.join("test_repo").join("feature-source");
         let target_path = env.storage_root.join("test_repo").join("feature-target");
@@ -46,8 +46,8 @@ fn test_sync_config_with_sanitized_names() -> Result<()> {
 
     env.run_test(|| {
         // Create worktrees with special characters
-        create::create_worktree("feature/sync-source", None, CreateMode::Smart)?;
-        create::create_worktree("feature/sync-target", None, CreateMode::Smart)?;
+        create::create_worktree("feature/sync-source", CreateMode::Smart)?;
+        create::create_worktree("feature/sync-target", CreateMode::Smart)?;
 
         let source_path = env
             .storage_root
@@ -82,8 +82,8 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
 
     env.run_test(|| {
         // Create worktrees
-        create::create_worktree("feature/abs-source", None, CreateMode::Smart)?;
-        create::create_worktree("feature/abs-target", None, CreateMode::Smart)?;
+        create::create_worktree("feature/abs-source", CreateMode::Smart)?;
+        create::create_worktree("feature/abs-target", CreateMode::Smart)?;
 
         let source_path = env
             .storage_root
@@ -116,7 +116,7 @@ fn test_sync_config_nonexistent_source() -> Result<()> {
 
     env.run_test(|| {
         // Create only target worktree
-        create::create_worktree("feature/target-only", None, CreateMode::Smart)?;
+        create::create_worktree("feature/target-only", CreateMode::Smart)?;
 
         // Try to sync from nonexistent source
         let result = sync_config::sync_config("nonexistent", "feature/target-only");
@@ -133,7 +133,7 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
 
     env.run_test(|| {
         // Create only source worktree
-        create::create_worktree("feature/source-only", None, CreateMode::Smart)?;
+        create::create_worktree("feature/source-only", CreateMode::Smart)?;
 
         // Try to sync to nonexistent target
         let result = sync_config::sync_config("feature/source-only", "nonexistent");
@@ -145,39 +145,29 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
 }
 
 #[test]
-fn test_sync_config_mixed_worktree_types() -> Result<()> {
+fn test_sync_config_multiple_managed_worktrees() -> Result<()> {
     let env = TestEnvironment::new()?;
-    let custom_source = env.temp_dir.path().join("custom_source");
-    let custom_target = env.temp_dir.path().join("custom_target");
 
     env.run_test(|| {
-        // Create custom path worktrees
-        create::create_worktree(
-            "feature/custom-source",
-            Some(custom_source.to_str().unwrap()),
-            CreateMode::Smart,
-        )?;
-        create::create_worktree(
-            "feature/custom-target",
-            Some(custom_target.to_str().unwrap()),
-            CreateMode::Smart,
-        )?;
+        // Create managed worktrees
+        create::create_worktree("feature/source", CreateMode::Smart)?;
+        create::create_worktree("feature/target", CreateMode::Smart)?;
 
-        assert!(custom_source.exists());
-        assert!(custom_target.exists());
+        let source_path = env.storage_root.join("test_repo").join("feature-source");
+        let target_path = env.storage_root.join("test_repo").join("feature-target");
 
-        // Create config in custom source
-        let env_file = custom_source.join(".env");
+        assert!(source_path.exists());
+        assert!(target_path.exists());
+
+        // Create config in source
+        let env_file = source_path.join(".env");
         fs::write(&env_file, "NODE_ENV=development")?;
 
-        // Sync from custom source to custom target
-        sync_config::sync_config(
-            custom_source.to_str().unwrap(),
-            custom_target.to_str().unwrap(),
-        )?;
+        // Sync from source to target using branch names
+        sync_config::sync_config("feature/source", "feature/target")?;
 
         // Verify sync worked
-        let target_env = custom_target.join(".env");
+        let target_env = target_path.join(".env");
         assert!(target_env.exists());
         let content = fs::read_to_string(target_env)?;
         assert!(content.contains("NODE_ENV"));

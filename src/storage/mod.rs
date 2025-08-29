@@ -172,4 +172,120 @@ impl WorktreeStorage {
     pub fn get_repo_storage_dir(&self, repo_name: &str) -> PathBuf {
         self.root_dir.join(repo_name)
     }
+
+    /// Gets the root storage directory
+    #[must_use]
+    pub fn get_root_dir(&self) -> &PathBuf {
+        &self.root_dir
+    }
+
+    /// Stores origin information for a worktree
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to create the storage directory
+    /// - Failed to write the origin mapping file
+    pub fn store_worktree_origin(
+        &self,
+        repo_name: &str,
+        branch_name: &str,
+        origin_path: &str,
+    ) -> Result<()> {
+        let repo_dir = self.root_dir.join(repo_name);
+        std::fs::create_dir_all(&repo_dir)?;
+
+        let origin_mapping_file = repo_dir.join(".worktree-origins");
+        let sanitized_branch = Self::sanitize_branch_name(branch_name);
+        let mapping_entry = format!("{} -> {}\n", sanitized_branch, origin_path);
+
+        // Read existing mappings
+        let mut existing_content = if origin_mapping_file.exists() {
+            std::fs::read_to_string(&origin_mapping_file)?
+        } else {
+            String::new()
+        };
+
+        // Check if mapping already exists
+        let search_line = format!("{} -> {}", sanitized_branch, origin_path);
+        if !existing_content.contains(&search_line) {
+            existing_content.push_str(&mapping_entry);
+            std::fs::write(&origin_mapping_file, existing_content)?;
+        }
+
+        Ok(())
+    }
+
+    /// Retrieves origin information for a worktree
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read the origin mapping file
+    pub fn get_worktree_origin(
+        &self,
+        repo_name: &str,
+        branch_name: &str,
+    ) -> Result<Option<String>> {
+        let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
+
+        if !origin_mapping_file.exists() {
+            return Ok(None);
+        }
+
+        let content = std::fs::read_to_string(&origin_mapping_file)?;
+        let sanitized_branch = Self::sanitize_branch_name(branch_name);
+        
+        for line in content.lines() {
+            if let Some((branch, origin)) = line.split_once(" -> ") {
+                if branch == sanitized_branch {
+                    return Ok(Some(origin.to_string()));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Removes origin information for a worktree
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read or write the origin mapping file
+    pub fn remove_worktree_origin(
+        &self,
+        repo_name: &str,
+        branch_name: &str,
+    ) -> Result<()> {
+        let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
+
+        if !origin_mapping_file.exists() {
+            return Ok(()); // Nothing to remove
+        }
+
+        let content = std::fs::read_to_string(&origin_mapping_file)?;
+        let sanitized_branch = Self::sanitize_branch_name(branch_name);
+        
+        // Filter out the line for this branch
+        let new_content: String = content
+            .lines()
+            .filter(|line| {
+                if let Some((branch, _)) = line.split_once(" -> ") {
+                    branch != sanitized_branch
+                } else {
+                    true // Keep malformed lines
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Add trailing newline if there's content
+        let final_content = if new_content.is_empty() {
+            String::new()
+        } else {
+            format!("{}\n", new_content)
+        };
+
+        std::fs::write(&origin_mapping_file, final_content)?;
+
+        Ok(())
+    }
 }
