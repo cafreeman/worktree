@@ -9,20 +9,13 @@ use test_helpers::TestEnvironment;
 #[derive(Clone)]
 struct MockGitRepo {
     repo_path: PathBuf,
-    config_values: std::collections::HashMap<String, String>,
     inherit_config_called: std::sync::Arc<std::sync::Mutex<bool>>,
 }
 
 impl MockGitRepo {
     fn new(repo_path: PathBuf) -> Self {
-        let mut config_values = std::collections::HashMap::new();
-        config_values.insert("user.name".to_string(), "Test User".to_string());
-        config_values.insert("user.email".to_string(), "test@example.com".to_string());
-        config_values.insert("core.editor".to_string(), "vim".to_string());
-
         Self {
             repo_path,
-            config_values,
             inherit_config_called: std::sync::Arc::new(std::sync::Mutex::new(false)),
         }
     }

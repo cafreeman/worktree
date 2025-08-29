@@ -5,6 +5,7 @@ use tempfile::TempDir;
 
 /// A test environment that sets up real git repositories and ensures cleanup
 pub struct TestEnvironment {
+    #[allow(dead_code)] // Needed to keep temp directory alive during tests
     pub temp_dir: TempDir,
     pub repo_path: PathBuf,
     pub storage_root: PathBuf,
