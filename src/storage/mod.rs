@@ -16,9 +16,9 @@ impl WorktreeStorage {
         let root_dir = if let Ok(custom_root) = std::env::var("WORKTREE_STORAGE_ROOT") {
             PathBuf::from(custom_root)
         } else {
-            dirs::data_dir()
-                .context("Failed to get user data directory")?
-                .join("worktrees")
+            dirs::home_dir()
+                .context("Failed to get user home directory")?
+                .join(".worktrees")
         };
 
         std::fs::create_dir_all(&root_dir).context("Failed to create worktrees directory")?;

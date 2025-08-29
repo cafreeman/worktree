@@ -13,9 +13,93 @@ A powerful CLI tool for managing git worktrees with enhanced features including 
 
 ## Installation
 
+### 1. Build and Install the Binary
+
 ```bash
+# Clone and build the project
+git clone <repository-url>
+cd worktree
 cargo build --release
-cp target/release/worktree /usr/local/bin/  # or add to PATH
+
+# Install the binary (choose one option)
+sudo cp target/release/worktree-bin /usr/local/bin/
+# OR add to your PATH
+cp target/release/worktree-bin ~/.local/bin/  # ensure ~/.local/bin is in PATH
+```
+
+### 2. Set Up Shell Integration
+
+The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and enhanced completions. You need to set this up for your shell:
+
+#### Bash
+
+Add to your `~/.bashrc` or `~/.bash_profile`:
+
+```bash
+# Generate and source worktree shell integration
+eval "$(worktree-bin init bash)"
+```
+
+#### Zsh
+
+Add to your `~/.zshrc`:
+
+```bash
+# Generate and source worktree shell integration
+eval "$(worktree-bin init zsh)"
+```
+
+#### Fish
+
+Add to your Fish config (`~/.config/fish/config.fish`):
+
+```fish
+# Generate and source worktree shell integration
+worktree-bin init fish | source
+```
+
+### 3. Enable Shell Completions (Optional)
+
+For enhanced tab completions, add these to your shell config:
+
+#### Bash
+
+```bash
+# Add to ~/.bashrc
+eval "$(worktree-bin completions bash)"
+```
+
+#### Zsh
+
+```bash
+# Add to ~/.zshrc  
+eval "$(worktree-bin completions zsh)"
+```
+
+#### Fish
+
+```fish
+# Add to ~/.config/fish/config.fish
+worktree-bin completions fish | source
+```
+
+### 4. Reload Your Shell
+
+```bash
+# Reload your shell configuration
+source ~/.bashrc   # for bash
+source ~/.zshrc    # for zsh
+# or restart your terminal
+```
+
+### Verify Installation
+
+```bash
+# Test that worktree command is available
+worktree --help
+
+# Test shell integration works
+worktree status
 ```
 
 ## Quick Start
