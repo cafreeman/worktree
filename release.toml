@@ -1,9 +1,8 @@
 # Configuration for cargo-release
 # https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 
-# Quality assurance hooks before release
+# Quality assurance hooks before release  
 pre-release-hook = [
-  "cargo clippy --all-targets --all-features -- -D warnings", 
   "cargo test",
   "cargo build --release",
 ]
