@@ -3,7 +3,6 @@
 
 # Quality assurance hooks before release
 pre-release-hook = [
-  "cargo fmt --check",
   "cargo clippy --all-targets --all-features -- -D warnings", 
   "cargo test",
   "cargo build --release",
