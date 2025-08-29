@@ -1,5 +1,8 @@
 use anyhow::Result;
-use worktree::commands::{create, remove};
+use worktree::commands::{
+    create::{self, CreateMode},
+    remove,
+};
 
 mod test_helpers;
 use test_helpers::TestEnvironment;
@@ -10,7 +13,7 @@ fn test_remove_worktree_success() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree using real git
-        create::create_worktree("feature/test", None, false)?;
+        create::create_worktree("feature/test", None, CreateMode::Smart)?;
 
         let worktree_path = env.storage_root.join("test_repo").join("feature-test");
         assert!(worktree_path.exists());
@@ -31,7 +34,7 @@ fn test_remove_worktree_with_branch_deletion() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree
-        create::create_worktree("feature/delete-me", None, false)?;
+        create::create_worktree("feature/delete-me", None, CreateMode::Smart)?;
 
         let worktree_path = env.storage_root.join("test_repo").join("feature-delete-me");
         assert!(worktree_path.exists());
@@ -52,7 +55,7 @@ fn test_remove_worktree_by_sanitized_name() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree with special characters
-        create::create_worktree("feature/test-branch", None, false)?;
+        create::create_worktree("feature/test-branch", None, CreateMode::Smart)?;
 
         let worktree_path = env
             .storage_root
@@ -76,7 +79,7 @@ fn test_remove_worktree_by_absolute_path() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree
-        create::create_worktree("feature/abs-path", None, false)?;
+        create::create_worktree("feature/abs-path", None, CreateMode::Smart)?;
 
         let worktree_path = env.storage_root.join("test_repo").join("feature-abs-path");
         assert!(worktree_path.exists());
@@ -115,7 +118,7 @@ fn test_remove_custom_path_worktree() -> Result<()> {
         create::create_worktree(
             "feature/custom-remove",
             Some(custom_path.to_str().unwrap()),
-            false,
+            CreateMode::Smart,
         )?;
         assert!(custom_path.exists());
 

@@ -1,7 +1,7 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
-use worktree::Result;
 use worktree::commands::init::Shell;
-use worktree::commands::{create, init, jump, list, remove, status, sync_config};
+use worktree::commands::{cleanup, create, init, jump, list, remove, status, sync_config};
+use worktree::Result;
 
 #[derive(Parser)]
 #[command(name = "worktree")]
@@ -21,9 +21,12 @@ enum Commands {
         /// Custom path for the worktree (optional)
         #[arg(short, long, value_hint = ValueHint::DirPath)]
         path: Option<String>,
-        /// Create a new branch if it doesn't exist
-        #[arg(short = 'b', long)]
-        create_branch: bool,
+        /// Force creation of a new branch (fail if it already exists)
+        #[arg(long, conflicts_with = "existing_branch")]
+        new_branch: bool,
+        /// Only use an existing branch (fail if it doesn't exist)
+        #[arg(long, conflicts_with = "new_branch")]
+        existing_branch: bool,
     },
     /// List all worktrees
     List {
@@ -36,9 +39,9 @@ enum Commands {
         /// Branch name or path to remove
         #[arg(value_hint = ValueHint::Other)]
         target: String,
-        /// Also delete the associated branch
-        #[arg(short, long)]
-        delete_branch: bool,
+        /// Keep the branch (only remove the worktree)
+        #[arg(long)]
+        keep_branch: bool,
     },
     /// Show worktree status
     Status,
@@ -78,6 +81,8 @@ enum Commands {
         #[arg(long)]
         current: bool,
     },
+    /// Clean up orphaned branches and worktree references
+    Cleanup,
 }
 
 fn main() -> Result<()> {
@@ -87,18 +92,26 @@ fn main() -> Result<()> {
         Commands::Create {
             branch,
             path,
-            create_branch,
+            new_branch,
+            existing_branch,
         } => {
-            create::create_worktree(&branch, path.as_deref(), create_branch)?;
+            let mode = if new_branch {
+                create::CreateMode::NewBranch
+            } else if existing_branch {
+                create::CreateMode::ExistingBranch
+            } else {
+                create::CreateMode::Smart
+            };
+            create::create_worktree(&branch, path.as_deref(), mode)?;
         }
         Commands::List { current } => {
             list::list_worktrees(current)?;
         }
         Commands::Remove {
             target,
-            delete_branch,
+            keep_branch,
         } => {
-            remove::remove_worktree(&target, delete_branch)?;
+            remove::remove_worktree(&target, !keep_branch)?;
         }
         Commands::Status => {
             status::show_status()?;
@@ -120,6 +133,9 @@ fn main() -> Result<()> {
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
             init::generate_completions(shell, &mut cmd);
+        }
+        Commands::Cleanup => {
+            cleanup::cleanup_worktrees()?;
         }
     }
 

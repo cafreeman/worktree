@@ -1,5 +1,8 @@
 use anyhow::Result;
-use worktree::commands::{create, status};
+use worktree::commands::{
+    create::{self, CreateMode},
+    status,
+};
 
 mod test_helpers;
 use test_helpers::TestEnvironment;
@@ -22,8 +25,8 @@ fn test_show_status_with_worktrees() -> Result<()> {
 
     env.run_test(|| {
         // Create some worktrees
-        create::create_worktree("feature/status1", None, false)?;
-        create::create_worktree("feature/status2", None, false)?;
+        create::create_worktree("feature/status1", None, CreateMode::Smart)?;
+        create::create_worktree("feature/status2", None, CreateMode::Smart)?;
 
         // Verify worktrees were created
         let worktree_path1 = env.storage_root.join("test_repo").join("feature-status1");
@@ -44,7 +47,7 @@ fn test_show_status_missing_directories() -> Result<()> {
 
     env.run_test(|| {
         // Create a worktree
-        create::create_worktree("feature/missing", None, false)?;
+        create::create_worktree("feature/missing", None, CreateMode::Smart)?;
 
         let worktree_path = env.storage_root.join("test_repo").join("feature-missing");
         assert!(worktree_path.exists());
@@ -67,13 +70,13 @@ fn test_show_status_custom_path_worktree() -> Result<()> {
 
     env.run_test(|| {
         // Create a managed worktree
-        create::create_worktree("feature/managed-status", None, false)?;
+        create::create_worktree("feature/managed-status", None, CreateMode::Smart)?;
 
         // Create a custom path worktree (not managed)
         create::create_worktree(
             "feature/custom-status",
             Some(custom_path.to_str().unwrap()),
-            false,
+            CreateMode::Smart,
         )?;
         assert!(custom_path.exists());
 
@@ -92,10 +95,10 @@ fn test_show_status_mixed_scenarios() -> Result<()> {
         // Create multiple worktrees in different states
 
         // 1. Normal active worktree
-        create::create_worktree("feature/active", None, false)?;
+        create::create_worktree("feature/active", None, CreateMode::Smart)?;
 
         // 2. Worktree that will be missing
-        create::create_worktree("feature/will-be-missing", None, false)?;
+        create::create_worktree("feature/will-be-missing", None, CreateMode::Smart)?;
 
         let missing_path = env
             .storage_root
@@ -106,7 +109,7 @@ fn test_show_status_mixed_scenarios() -> Result<()> {
         assert!(!missing_path.exists());
 
         // 3. Worktree with special characters
-        create::create_worktree("feature/test-special", None, false)?;
+        create::create_worktree("feature/test-special", None, CreateMode::Smart)?;
 
         // Status should handle all these scenarios
         status::show_status()?;

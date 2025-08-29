@@ -1,6 +1,9 @@
 use anyhow::Result;
 use std::fs;
-use worktree::commands::{create, sync_config};
+use worktree::commands::{
+    create::{self, CreateMode},
+    sync_config,
+};
 
 mod test_helpers;
 use test_helpers::TestEnvironment;
@@ -11,8 +14,8 @@ fn test_sync_config_between_worktrees() -> Result<()> {
 
     env.run_test(|| {
         // Create source and target worktrees
-        create::create_worktree("feature/source", None, false)?;
-        create::create_worktree("feature/target", None, false)?;
+        create::create_worktree("feature/source", None, CreateMode::Smart)?;
+        create::create_worktree("feature/target", None, CreateMode::Smart)?;
 
         let source_path = env.storage_root.join("test_repo").join("feature-source");
         let target_path = env.storage_root.join("test_repo").join("feature-target");
@@ -43,8 +46,8 @@ fn test_sync_config_with_sanitized_names() -> Result<()> {
 
     env.run_test(|| {
         // Create worktrees with special characters
-        create::create_worktree("feature/sync-source", None, false)?;
-        create::create_worktree("feature/sync-target", None, false)?;
+        create::create_worktree("feature/sync-source", None, CreateMode::Smart)?;
+        create::create_worktree("feature/sync-target", None, CreateMode::Smart)?;
 
         let source_path = env
             .storage_root
@@ -79,8 +82,8 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
 
     env.run_test(|| {
         // Create worktrees
-        create::create_worktree("feature/abs-source", None, false)?;
-        create::create_worktree("feature/abs-target", None, false)?;
+        create::create_worktree("feature/abs-source", None, CreateMode::Smart)?;
+        create::create_worktree("feature/abs-target", None, CreateMode::Smart)?;
 
         let source_path = env
             .storage_root
@@ -113,7 +116,7 @@ fn test_sync_config_nonexistent_source() -> Result<()> {
 
     env.run_test(|| {
         // Create only target worktree
-        create::create_worktree("feature/target-only", None, false)?;
+        create::create_worktree("feature/target-only", None, CreateMode::Smart)?;
 
         // Try to sync from nonexistent source
         let result = sync_config::sync_config("nonexistent", "feature/target-only");
@@ -130,7 +133,7 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
 
     env.run_test(|| {
         // Create only source worktree
-        create::create_worktree("feature/source-only", None, false)?;
+        create::create_worktree("feature/source-only", None, CreateMode::Smart)?;
 
         // Try to sync to nonexistent target
         let result = sync_config::sync_config("feature/source-only", "nonexistent");
@@ -152,12 +155,12 @@ fn test_sync_config_mixed_worktree_types() -> Result<()> {
         create::create_worktree(
             "feature/custom-source",
             Some(custom_source.to_str().unwrap()),
-            false,
+            CreateMode::Smart,
         )?;
         create::create_worktree(
             "feature/custom-target",
             Some(custom_target.to_str().unwrap()),
-            false,
+            CreateMode::Smart,
         )?;
 
         assert!(custom_source.exists());

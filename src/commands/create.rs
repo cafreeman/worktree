@@ -5,41 +5,54 @@ use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Mode for creating worktrees
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CreateMode {
+    /// Smart mode: create branch if needed, use existing if present
+    Smart,
+    /// Force new branch creation (fail if exists)
+    NewBranch,
+    /// Only use existing branch (fail if doesn't exist)
+    ExistingBranch,
+}
+
 /// Creates a new worktree for the specified branch
 ///
 /// # Errors
 /// Returns an error if:
 /// - The current directory is not a git repository
-/// - The branch doesn't exist and create_branch is false
+/// - The branch doesn't exist and mode is ExistingBranch
+/// - The branch exists and mode is NewBranch
 /// - Failed to create the worktree directory
 /// - Git operations fail
-pub fn create_worktree(branch: &str, custom_path: Option<&str>, create_branch: bool) -> Result<()> {
+pub fn create_worktree(branch: &str, custom_path: Option<&str>, mode: CreateMode) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    create_worktree_internal(&git_repo, branch, custom_path, create_branch)
+    create_worktree_internal(&git_repo, branch, custom_path, mode)
 }
 
 /// Test version that accepts a mock git repository
 ///
 /// # Errors
 /// Returns an error if:
-/// - The branch doesn't exist and create_branch is false
+/// - The branch doesn't exist and mode is ExistingBranch
+/// - The branch exists and mode is NewBranch
 /// - Failed to create the worktree directory
 /// - Git operations fail
 pub fn create_worktree_with_git(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
     custom_path: Option<&str>,
-    create_branch: bool,
+    mode: CreateMode,
 ) -> Result<()> {
-    create_worktree_internal(git_repo, branch, custom_path, create_branch)
+    create_worktree_internal(git_repo, branch, custom_path, mode)
 }
 
 fn create_worktree_internal(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
     custom_path: Option<&str>,
-    create_branch: bool,
+    mode: CreateMode,
 ) -> Result<()> {
     let repo_path = git_repo.get_repo_path();
     let storage = WorktreeStorage::new()?;
@@ -50,8 +63,34 @@ fn create_worktree_internal(
         storage.get_worktree_path(&repo_name, branch)
     };
 
+    // Pre-flight checks
     if worktree_path.exists() {
         anyhow::bail!("Worktree path already exists: {}", worktree_path.display());
+    }
+
+    let branch_exists = git_repo.branch_exists(branch)?;
+
+    // Validate based on mode
+    match mode {
+        CreateMode::NewBranch => {
+            if branch_exists {
+                anyhow::bail!(
+                    "Branch '{}' already exists. Use 'worktree create {}' (without --new-branch) to create a worktree for it",
+                    branch, branch
+                );
+            }
+        }
+        CreateMode::ExistingBranch => {
+            if !branch_exists {
+                anyhow::bail!(
+                    "Branch '{}' doesn't exist. Use 'worktree create {}' (without --existing-branch) to create it",
+                    branch, branch
+                );
+            }
+        }
+        CreateMode::Smart => {
+            // No validation needed - we'll handle both cases
+        }
     }
 
     // Ensure parent directory exists
@@ -66,8 +105,13 @@ fn create_worktree_internal(
         worktree_path.display()
     );
 
-    if create_branch || !git_repo.branch_exists(branch)? {
+    // Determine if we need to create the branch
+    let create_branch = !branch_exists;
+
+    if create_branch {
         println!("Creating new branch: {}", branch);
+    } else {
+        println!("Using existing branch: {}", branch);
     }
 
     git_repo.create_worktree(branch, &worktree_path, create_branch)?;

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use worktree::commands::create;
 use std::path::{Path, PathBuf};
+use worktree::commands::create::{self, CreateMode};
 
 mod test_helpers;
 use test_helpers::TestEnvironment;
@@ -19,7 +19,7 @@ impl MockGitRepo {
         config_values.insert("user.name".to_string(), "Test User".to_string());
         config_values.insert("user.email".to_string(), "test@example.com".to_string());
         config_values.insert("core.editor".to_string(), "vim".to_string());
-        
+
         Self {
             repo_path,
             config_values,
@@ -45,16 +45,25 @@ impl worktree::traits::GitOperations for MockGitRepo {
     }
 
     fn branch_exists(&self, _branch_name: &str) -> Result<bool> {
-        Ok(true)
+        // Return false so that smart mode will create the branch
+        Ok(false)
     }
 
-    fn create_worktree(&self, _branch_name: &str, worktree_path: &Path, _create_branch: bool) -> Result<()> {
+    fn create_worktree(
+        &self,
+        _branch_name: &str,
+        worktree_path: &Path,
+        _create_branch: bool,
+    ) -> Result<()> {
         std::fs::create_dir_all(worktree_path)?;
-        
+
         // Create a minimal git worktree structure
         let git_dir = worktree_path.join(".git");
-        std::fs::write(&git_dir, format!("gitdir: {}", self.repo_path.join(".git").display()))?;
-        
+        std::fs::write(
+            &git_dir,
+            format!("gitdir: {}", self.repo_path.join(".git").display()),
+        )?;
+
         Ok(())
     }
 
@@ -81,8 +90,8 @@ fn test_create_worktree_simple() -> Result<()> {
     let env = TestEnvironment::new()?;
 
     env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature/test", None, false)?;
+        // Create a worktree (smart mode will create the branch since it doesn't exist)
+        create::create_worktree("feature/test", None, CreateMode::Smart)?;
 
         // Verify real files were created
         let worktree_path = env.storage_root.join("test_repo").join("feature-test");
@@ -105,7 +114,11 @@ fn test_create_worktree_custom_path() -> Result<()> {
     let custom_path = env.temp_dir.path().join("custom_location");
 
     env.run_test(|| {
-        create::create_worktree("feature/test", Some(custom_path.to_str().unwrap()), false)?;
+        create::create_worktree(
+            "feature/test",
+            Some(custom_path.to_str().unwrap()),
+            CreateMode::Smart,
+        )?;
 
         // Custom path should exist
         assert!(custom_path.exists());
@@ -127,7 +140,7 @@ fn test_create_worktree_path_exists() -> Result<()> {
         let worktree_path = env.storage_root.join("test_repo").join("feature-test");
         std::fs::create_dir_all(&worktree_path)?;
 
-        let result = create::create_worktree("feature/test", None, false);
+        let result = create::create_worktree("feature/test", None, CreateMode::Smart);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
 
@@ -138,16 +151,19 @@ fn test_create_worktree_path_exists() -> Result<()> {
 #[test]
 fn test_config_inheritance_is_called() -> Result<()> {
     let env = TestEnvironment::new()?;
-    
+
     env.run_test(|| {
         let mock_git = MockGitRepo::new(env.repo_path.clone());
-        
+
         // Test that config inheritance is called during worktree creation
-        create::create_worktree_with_git(&mock_git, "feature/test", None, false)?;
-        
+        create::create_worktree_with_git(&mock_git, "feature/test", None, CreateMode::Smart)?;
+
         // Verify that inherit_config was called
-        assert!(mock_git.was_inherit_config_called(), "inherit_config should have been called");
-        
+        assert!(
+            mock_git.was_inherit_config_called(),
+            "inherit_config should have been called"
+        );
+
         Ok(())
     })
 }
@@ -155,23 +171,26 @@ fn test_config_inheritance_is_called() -> Result<()> {
 #[test]
 fn test_config_inheritance_with_real_git() -> Result<()> {
     let env = TestEnvironment::new()?;
-    
+
     env.run_test(|| {
         // Set some additional git config in the test repo
         std::process::Command::new("git")
             .args(["config", "core.editor", "nano"])
             .current_dir(&env.repo_path)
             .output()?;
-            
+
         std::process::Command::new("git")
             .args(["config", "user.signingkey", "test-key"])
             .current_dir(&env.repo_path)
             .output()?;
 
         // Create a worktree (this will use real GitRepo and config inheritance)
-        create::create_worktree("feature/config-test", None, false)?;
+        create::create_worktree("feature/config-test", None, CreateMode::Smart)?;
 
-        let worktree_path = env.storage_root.join("test_repo").join("feature-config-test");
+        let worktree_path = env
+            .storage_root
+            .join("test_repo")
+            .join("feature-config-test");
         assert!(worktree_path.exists(), "Worktree should be created");
 
         // Check that extensions.worktreeConfig is enabled in the main repo
@@ -179,19 +198,27 @@ fn test_config_inheritance_with_real_git() -> Result<()> {
             .args(["config", "extensions.worktreeConfig"])
             .current_dir(&env.repo_path)
             .output()?;
-        
+
         let config_value = String::from_utf8(output.stdout)?;
-        assert_eq!(config_value.trim(), "true", "worktreeConfig extension should be enabled");
+        assert_eq!(
+            config_value.trim(),
+            "true",
+            "worktreeConfig extension should be enabled"
+        );
 
         // Verify worktree has inherited config by checking the worktree-specific config
         let output = std::process::Command::new("git")
             .args(["config", "--worktree", "--get", "user.name"])
             .current_dir(&worktree_path)
             .output()?;
-        
+
         if output.status.success() {
             let user_name = String::from_utf8(output.stdout)?;
-            assert_eq!(user_name.trim(), "Test User", "user.name should be inherited");
+            assert_eq!(
+                user_name.trim(),
+                "Test User",
+                "user.name should be inherited"
+            );
         }
 
         Ok(())
