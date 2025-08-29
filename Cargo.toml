@@ -6,9 +6,19 @@ description = "A powerful CLI tool for managing git worktrees with enhanced feat
 license = "MIT"
 repository = "https://github.com/cafreeman/worktree"
 homepage = "https://github.com/cafreeman/worktree"
+documentation = "https://github.com/cafreeman/worktree#readme"
+readme = "README.md"
 keywords = ["git", "worktree", "cli", "development", "branch"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["Chris Freeman <cfreeman.code@gmail.com>"]
+exclude = [
+    "/.github/",
+    "/tests/",
+    "/.gitignore",
+    "/release.toml",
+    "/CLAUDE.md",
+    "/SHELL_INTEGRATION.md"
+]
 
 [[bin]]
 name = "worktree-bin"
