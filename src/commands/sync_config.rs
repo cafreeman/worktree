@@ -6,13 +6,21 @@ use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Synchronizes configuration files between two worktrees
+///
+/// # Errors
+/// Returns an error if:
+/// - Source or target worktree doesn't exist
+/// - Failed to access storage system
+/// - Failed to copy configuration files
+/// - Permission issues with file operations
 pub fn sync_config(from: &str, to: &str) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     let repo_path = git_repo.get_repo_path();
 
     let storage = WorktreeStorage::new()?;
-    let repo_name = storage.get_repo_name(repo_path)?;
+    let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     let (from_path, _) = resolve_worktree_path(from, &storage, &repo_name)?;
     let (to_path, _) = resolve_worktree_path(to, &storage, &repo_name)?;

@@ -52,10 +52,12 @@ worktree create <branch> [OPTIONS]
 ```
 
 **Options:**
+
 - `-p, --path <PATH>` - Custom path for the worktree (optional)
 - `-b, --create-branch` - Create a new branch if it doesn't exist
 
 **Examples:**
+
 ```bash
 # Create worktree for existing branch
 worktree create feature/login
@@ -74,9 +76,11 @@ worktree list [OPTIONS]
 ```
 
 **Options:**
+
 - `--current` - Show worktrees for current repo only
 
 **Examples:**
+
 ```bash
 # List all managed worktrees
 worktree list
@@ -92,9 +96,11 @@ worktree remove <target> [OPTIONS]
 ```
 
 **Options:**
+
 - `-d, --delete-branch` - Also delete the associated branch
 
 **Examples:**
+
 ```bash
 # Remove worktree by branch name
 worktree remove feature/auth
@@ -113,6 +119,7 @@ worktree status
 ```
 
 Displays comprehensive information about:
+
 - Git worktrees vs managed worktrees
 - Directory existence status
 - Synchronization state
@@ -125,6 +132,7 @@ worktree sync-config <from> <to>
 ```
 
 **Examples:**
+
 ```bash
 # Sync config from main to feature branch
 worktree sync-config main feature/auth
@@ -163,12 +171,14 @@ exclude = [
 **Default patterns (if no config file exists):**
 
 Include:
+
 - `.env*` - Environment files
 - `.vscode/` - VS Code settings
 - `*.local.json` - Local configuration files
 - `config/local/*` - Local config directories
 
 Exclude:
+
 - `node_modules/`, `target/` - Build artifacts
 - `.git/` - Git directory
 - `*.log`, `*.tmp` - Temporary files
@@ -182,7 +192,7 @@ Worktrees are organized in a clean, predictable structure:
 ├── my-project/
 │   ├── main/
 │   ├── feature-auth/          # branch: feature/auth
-│   ├── bugfix-login/          # branch: bugfix/login  
+│   ├── bugfix-login/          # branch: bugfix/login
 │   └── develop/
 ├── another-repo/
 │   ├── main/
@@ -193,6 +203,7 @@ Worktrees are organized in a clean, predictable structure:
 
 **Branch Name Sanitization:**
 Branch names containing slashes and special characters are automatically sanitized for safe filesystem storage:
+
 - `feature/auth` → `feature-auth/`
 - `bugfix/critical-issue` → `bugfix-critical-issue/`
 - `release/v1.0` → `release-v1.0/`
@@ -202,6 +213,7 @@ The original branch names are preserved and displayed in all commands.
 ## Use Cases
 
 ### 1. Feature Development
+
 ```bash
 # Start working on a new feature
 worktree create -b feature/payments
@@ -214,6 +226,7 @@ worktree remove feature/payments --delete-branch
 ```
 
 ### 2. Bug Fixes on Multiple Branches
+
 ```bash
 # Create worktrees for different versions
 worktree create release/v1.0
@@ -224,6 +237,7 @@ worktree create release/v2.0
 ```
 
 ### 3. Code Review
+
 ```bash
 # Create temporary worktree for PR review
 worktree create pr-123
@@ -236,6 +250,7 @@ worktree remove pr-123
 ```
 
 ### 4. Development Environment Management
+
 ```bash
 # Sync updated config to all worktrees
 worktree sync-config main feature/auth
@@ -248,17 +263,20 @@ worktree status
 ## Troubleshooting
 
 ### Worktree exists but not in git
+
 ```bash
 worktree status  # Shows inconsistent state
 # Remove the directory manually and recreate
 ```
 
 ### Config files not copying
+
 1. Check `.worktree-config.toml` syntax
 2. Verify file patterns match your files
 3. Ensure files aren't excluded by exclude patterns
 
 ### Permission issues
+
 ```bash
 # Ensure worktree directory is writable
 chmod -R u+w ~/.worktrees/
@@ -273,6 +291,7 @@ Set a custom worktree storage location by modifying the storage module or using 
 ### Integration with IDEs
 
 The consistent storage structure makes it easy to:
+
 - Configure IDE project templates
 - Set up automated workflows
 - Create shell aliases for common operations

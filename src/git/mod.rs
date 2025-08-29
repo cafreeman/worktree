@@ -9,15 +9,26 @@ pub struct GitRepo {
 }
 
 impl GitRepo {
+    /// Opens a git repository at the specified path
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The path is not a valid git repository
+    /// - Failed to access the repository
     pub fn open(path: &Path) -> Result<Self> {
         let repo = Repository::discover(path).context("Failed to find git repository")?;
         Ok(Self { repo })
     }
 
+    #[must_use]
     pub fn get_repo_path(&self) -> &Path {
         self.repo.workdir().unwrap_or_else(|| self.repo.path())
     }
 
+    /// Checks if a branch exists in the repository
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
     pub fn branch_exists(&self, branch_name: &str) -> Result<bool> {
         match self.repo.find_branch(branch_name, BranchType::Local) {
             Ok(_) => Ok(true),
@@ -26,6 +37,13 @@ impl GitRepo {
         }
     }
 
+    /// Creates a new worktree for the specified branch
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to create the worktree
+    /// - Branch doesn't exist and create_branch is false
+    /// - Git operations fail
     pub fn create_worktree(
         &self,
         branch_name: &str,
@@ -53,21 +71,35 @@ impl GitRepo {
         Ok(())
     }
 
+    /// Removes a worktree from the repository
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
     pub fn remove_worktree(&self, worktree_name: &str) -> Result<()> {
         let worktree = self.repo.find_worktree(worktree_name)?;
         worktree.prune(Some(git2::WorktreePruneOptions::new().valid(true)))?;
         Ok(())
     }
 
+    /// Lists all worktrees in the repository
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
     pub fn list_worktrees(&self) -> Result<Vec<String>> {
         let worktree_names = self.repo.worktrees()?;
         Ok(worktree_names
             .into_iter()
-            .filter_map(|s| s)
-            .map(|s| s.to_string())
+            .flatten()
+            .map(std::string::ToString::to_string)
             .collect())
     }
 
+    /// Deletes a branch from the repository
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Branch doesn't exist
+    /// - Git operations fail
     pub fn delete_branch(&self, branch_name: &str) -> Result<()> {
         let mut branch = self.repo.find_branch(branch_name, BranchType::Local)?;
         branch.delete()?;

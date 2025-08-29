@@ -5,13 +5,21 @@ use std::path::Path;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Removes a worktree and optionally deletes the associated branch
+///
+/// # Errors
+/// Returns an error if:
+/// - The target worktree doesn't exist
+/// - Failed to access storage system
+/// - Git operations fail
+/// - Failed to remove worktree directory
 pub fn remove_worktree(target: &str, delete_branch: bool) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     let repo_path = git_repo.get_repo_path();
 
     let storage = WorktreeStorage::new()?;
-    let repo_name = storage.get_repo_name(&repo_path)?;
+    let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     let (worktree_path, branch_name) = resolve_target(target, &storage, &repo_name)?;
 

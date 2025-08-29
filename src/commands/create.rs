@@ -5,6 +5,14 @@ use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Creates a new worktree for the specified branch
+///
+/// # Errors
+/// Returns an error if:
+/// - The current directory is not a git repository
+/// - The branch doesn't exist and create_branch is false
+/// - Failed to create the worktree directory
+/// - Git operations fail
 pub fn create_worktree(branch: &str, custom_path: Option<&str>, create_branch: bool) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
@@ -12,6 +20,12 @@ pub fn create_worktree(branch: &str, custom_path: Option<&str>, create_branch: b
 }
 
 /// Test version that accepts a mock git repository
+///
+/// # Errors
+/// Returns an error if:
+/// - The branch doesn't exist and create_branch is false
+/// - Failed to create the worktree directory
+/// - Git operations fail
 pub fn create_worktree_with_git(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
@@ -29,7 +43,7 @@ fn create_worktree_internal(
 ) -> Result<()> {
     let repo_path = git_repo.get_repo_path();
     let storage = WorktreeStorage::new()?;
-    let repo_name = storage.get_repo_name(&repo_path)?;
+    let repo_name = WorktreeStorage::get_repo_name(&repo_path)?;
     let worktree_path = if let Some(path) = custom_path {
         Path::new(path).to_path_buf()
     } else {
@@ -77,6 +91,14 @@ fn create_worktree_internal(
     Ok(())
 }
 
+/// Copies configuration files from source to target based on config patterns
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to read files from source directory
+/// - Failed to create target directory
+/// - Failed to copy files
+/// - Pattern matching fails
 pub fn copy_config_files(
     source_path: &Path,
     target_path: &Path,

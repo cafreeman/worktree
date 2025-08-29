@@ -3,13 +3,20 @@ use anyhow::Result;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Shows the status of all worktrees in the current repository
+///
+/// # Errors
+/// Returns an error if:
+/// - Not in a git repository
+/// - Failed to access storage system
+/// - Git operations fail
 pub fn show_status() -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     let repo_path = git_repo.get_repo_path();
 
     let storage = WorktreeStorage::new()?;
-    let repo_name = storage.get_repo_name(repo_path)?;
+    let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     println!("Git Worktree Status");
     println!("{}", "=".repeat(40));

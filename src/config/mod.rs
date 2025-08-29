@@ -38,6 +38,13 @@ impl Default for WorktreeConfig {
 }
 
 impl WorktreeConfig {
+    /// Loads worktree configuration from a repository
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read the config file
+    /// - Config file has invalid TOML syntax
+    /// - Failed to deserialize the configuration
     pub fn load_from_repo(repo_path: &Path) -> Result<Self> {
         let config_path = repo_path.join(".worktree-config.toml");
 

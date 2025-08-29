@@ -3,6 +3,13 @@ use anyhow::Result;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
+/// Lists all worktrees, optionally filtered to current repository only
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to access the storage system
+/// - Failed to determine current repository
+/// - Git operations fail
 pub fn list_worktrees(current_repo_only: bool) -> Result<()> {
     let storage = WorktreeStorage::new()?;
 
@@ -19,7 +26,7 @@ fn list_current_repo_worktrees(storage: &WorktreeStorage) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     let repo_path = git_repo.get_repo_path();
-    let repo_name = storage.get_repo_name(repo_path)?;
+    let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     println!("Worktrees for repository: {}", repo_name);
     println!("{}", "=".repeat(40));

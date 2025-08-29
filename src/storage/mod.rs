@@ -6,6 +6,12 @@ pub struct WorktreeStorage {
 }
 
 impl WorktreeStorage {
+    /// Creates a new WorktreeStorage instance
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to determine home directory
+    /// - Failed to create storage directory
     pub fn new() -> Result<Self> {
         let root_dir = if let Ok(custom_root) = std::env::var("WORKTREE_STORAGE_ROOT") {
             PathBuf::from(custom_root)
@@ -20,7 +26,11 @@ impl WorktreeStorage {
         Ok(Self { root_dir })
     }
 
-    pub fn get_repo_name(&self, repo_path: &Path) -> Result<String> {
+    /// Extracts repository name from a path
+    ///
+    /// # Errors
+    /// Returns an error if the path doesn't have a valid file name
+    pub fn get_repo_name(repo_path: &Path) -> Result<String> {
         if let Some(name) = repo_path.file_name() {
             Ok(name.to_string_lossy().to_string())
         } else {
@@ -28,24 +38,22 @@ impl WorktreeStorage {
         }
     }
 
-    fn sanitize_branch_name(&self, branch_name: &str) -> String {
-        branch_name
-            .replace('/', "-")
-            .replace('\\', "-")
-            .replace(':', "-")
-            .replace('*', "-")
-            .replace('?', "-")
-            .replace('"', "-")
-            .replace('<', "-")
-            .replace('>', "-")
-            .replace('|', "-")
+    fn sanitize_branch_name(branch_name: &str) -> String {
+        branch_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "-")
     }
 
+    #[must_use]
     pub fn get_worktree_path(&self, repo_name: &str, branch_name: &str) -> PathBuf {
-        let safe_branch_name = self.sanitize_branch_name(branch_name);
+        let safe_branch_name = Self::sanitize_branch_name(branch_name);
         self.root_dir.join(repo_name).join(safe_branch_name)
     }
 
+    /// Retrieves the original branch name from a sanitized name
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read the mapping file
+    /// - Failed to parse the mapping data
     pub fn get_original_branch_name(
         &self,
         repo_name: &str,
@@ -71,6 +79,13 @@ impl WorktreeStorage {
         Ok(None)
     }
 
+    /// Stores a mapping between original and sanitized branch names
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to create the mapping directory
+    /// - Failed to write the mapping file
+    /// - Failed to serialize the mapping data
     pub fn store_branch_mapping(
         &self,
         repo_name: &str,
@@ -100,6 +115,12 @@ impl WorktreeStorage {
         Ok(())
     }
 
+    /// Lists all worktrees for a specific repository
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read the repository directory
+    /// - Directory access issues
     pub fn list_repo_worktrees(&self, repo_name: &str) -> Result<Vec<String>> {
         let repo_dir = self.root_dir.join(repo_name);
 
@@ -120,6 +141,12 @@ impl WorktreeStorage {
         Ok(worktrees)
     }
 
+    /// Lists all worktrees across all repositories
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to read the storage directory
+    /// - Directory access issues
     pub fn list_all_worktrees(&self) -> Result<Vec<(String, Vec<String>)>> {
         let mut all_worktrees = Vec::new();
 
