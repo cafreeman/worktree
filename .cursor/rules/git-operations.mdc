@@ -2,41 +2,29 @@
 globs: src/git/*.rs,src/traits.rs
 ---
 
-# Git Operations Guidelines
+# Git Operations
 
 ## GitOperations Trait
 
-The [GitOperations trait](mdc:src/traits.rs) provides an abstraction over git2 operations for testability:
+The [GitOperations trait](mdc:src/traits.rs) abstracts git2 operations for testability:
 
-- `open(path)` - Open a repository
-- `branch_exists(name)` - Check if branch exists
+- `open(path)` - Open repository
+- `get_repo_path()` - Get repository path
+- `branch_exists(name)` - Check branch existence
 - `create_worktree(branch, path, create_branch)` - Create new worktree
-- `remove_worktree(name)` - Remove existing worktree
+- `remove_worktree(name)` - Remove worktree
 - `list_worktrees()` - List all worktrees
-- `delete_branch(name)` - Delete a branch
+- `delete_branch(name)` - Delete branch
+- `inherit_config(worktree_path)` - Copy parent repo config to worktree
 
-## Error Handling
+## Implementation Standards
 
-- All methods return `anyhow::Result<T>`
-- Provide detailed error context for git operations
-- Handle common git errors gracefully
-- Document error conditions in function docs
+- All methods return `anyhow::Result<T>` with detailed error context
+- Use git2 crate with proper resource cleanup
+- Handle edge cases (missing repos, invalid branches, etc.)
+- Create mock implementations for testing
 
-## Implementation Guidelines
-
-- Use git2 crate for actual Git operations
-- Wrap git2 errors with meaningful context
-- Implement proper resource cleanup
-- Handle edge cases (missing repositories, invalid branches, etc.)
-
-## Testing Strategy
-
-- Create mock implementations of GitOperations for testing
-- Test both successful operations and error conditions
-- Use temporary Git repositories in tests
-- Verify Git state after operations
-
-## Common Patterns
+## Common Pattern
 
 ```rust
 use anyhow::{Context, Result};

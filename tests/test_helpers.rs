@@ -12,6 +12,14 @@ pub struct TestEnvironment {
 }
 
 impl TestEnvironment {
+    /// Creates a new test environment with a temporary git repository
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to create temporary directory
+    /// - Failed to initialize git repository
+    /// - Failed to configure git user settings
+    /// - Failed to create initial commit
     pub fn new() -> Result<Self> {
         let temp_dir = tempfile::tempdir()?;
         let repo_path = temp_dir.path().join("test_repo");
@@ -56,6 +64,12 @@ impl TestEnvironment {
     }
 
     /// Run a test function with proper environment setup and cleanup
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to get current directory
+    /// - Failed to change to test directory
+    /// - Test function itself returns an error
     pub fn run_test<F>(&self, test_fn: F) -> Result<()>
     where
         F: FnOnce() -> Result<()>,
@@ -69,12 +83,15 @@ impl TestEnvironment {
             Some(self.storage_root.to_string_lossy().to_string()),
             || {
                 // Change to repo directory
-                std::env::set_current_dir(&self.repo_path).unwrap();
+                // This is test code, so unwrap is acceptable
+                #[allow(clippy::expect_used)]
+                {
+                    std::env::set_current_dir(&self.repo_path)
+                        .expect("Failed to change to test repo directory");
+                }
 
                 // Run the test
-                let test_result = test_fn();
-
-                test_result
+                test_fn()
             },
         );
 

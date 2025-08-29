@@ -1,7 +1,7 @@
 # Configuration for cargo-release
 # https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 
-# Quality assurance hooks before release  
+# Quality assurance hooks before release
 # Note: Run these manually before release due to cargo-release environment limitations:
 # - cargo fmt --check
 # - cargo clippy --all-targets --all-features -- -D warnings
@@ -22,7 +22,6 @@ sign-tag = false
 # Release commit message
 pre-release-commit-message = "Release v{{version}}"
 
-# SAFETY: Never auto-publish - this is a local development tool setup only
 publish = true
 
 # Verify the contents look right before any operations

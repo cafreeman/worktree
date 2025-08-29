@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+
 use anyhow::Result;
 use worktree::commands::{
     create::{self, CreateMode},
@@ -62,7 +64,6 @@ fn test_show_status_missing_directories() -> Result<()> {
         Ok(())
     })
 }
-
 
 #[test]
 fn test_show_status_mixed_scenarios() -> Result<()> {

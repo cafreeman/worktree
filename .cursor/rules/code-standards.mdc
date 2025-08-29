@@ -1,0 +1,69 @@
+---
+globs: *.rs,tests/*.rs
+alwaysApply: false
+---
+
+# Code Standards & Testing
+
+## Rust Code Conventions
+
+### Error Handling
+
+- Use `anyhow::Result` for all fallible operations (imported as `Result` in [lib.rs](mdc:src/lib.rs))
+- Follow strict clippy lints: `unwrap_used = "deny"`, `expect_used = "warn"`, `panic = "deny"`
+- Prefer `?` operator over unwrap/expect
+- Use meaningful error messages with context
+- Document errors with `#[doc = "# Errors"]` sections
+
+### Code Quality Standards
+
+- Keep functions under 100 lines (`too-many-lines-threshold = 100`)
+- Maintain cognitive complexity under 30 (`cognitive-complexity-threshold = 30`)
+- Follow pedantic lints: `must_use_candidate`, `needless_pass_by_value`
+- Use clear, descriptive function and variable names
+
+### Dependencies & Module Structure
+
+- **Core Dependencies**: git2, clap (derive + env + color), clap_complete, serde + toml, dirs, anyhow, glob, inquire
+- **Test Dependencies**: tempfile, temp-env for isolated environments
+- Each command in its own file in [commands/](mdc:src/commands/)
+- Clear function signatures with proper error handling
+
+## Testing Conventions
+
+### Test Structure
+
+- Integration tests in [tests/](mdc:tests/) directory
+- Each command has its own test file (e.g., [create_tests.rs](mdc:tests/create_tests.rs))
+- Shared utilities in [test_helpers.rs](mdc:tests/test_helpers.rs)
+
+### Test Environment Setup
+
+- Use `tempfile::TempDir` for isolated filesystem operations
+- Use `temp-env` for environment variable manipulation
+- Mock Git operations using GitOperations trait from [traits.rs](mdc:src/traits.rs)
+- Set up clean temporary directories for each test
+
+### Test Patterns
+
+```rust
+use tempfile::TempDir;
+use worktree::Result;
+
+#[test]
+fn test_command_success_case() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    // Test setup
+    // Execute command
+    // Verify results
+    Ok(())
+}
+```
+
+### Testing Requirements
+
+- Test both success and error cases
+- Verify file system state after operations
+- Test command-line argument parsing
+- Use descriptive test names that explain the scenario
+- Assert file/directory existence, Git repository state, and command output content

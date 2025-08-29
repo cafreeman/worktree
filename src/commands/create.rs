@@ -251,11 +251,20 @@ fn store_origin_info(
     repo_path: &Path,
 ) -> Result<()> {
     // Store the canonical path to the repository
-    let canonical_repo_path = repo_path.canonicalize()
-        .with_context(|| format!("Failed to canonicalize repository path: {}", repo_path.display()))?;
-    
-    storage.store_worktree_origin(repo_name, branch_name, &canonical_repo_path.to_string_lossy())
+    let canonical_repo_path = repo_path.canonicalize().with_context(|| {
+        format!(
+            "Failed to canonicalize repository path: {}",
+            repo_path.display()
+        )
+    })?;
+
+    storage
+        .store_worktree_origin(
+            repo_name,
+            branch_name,
+            &canonical_repo_path.to_string_lossy(),
+        )
         .context("Failed to store worktree origin information")?;
-    
+
     Ok(())
 }

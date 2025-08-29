@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+
 use anyhow::Result;
 use std::fs;
 use worktree::commands::{

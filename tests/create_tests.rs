@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use worktree::commands::create::{self, CreateMode};
@@ -100,7 +102,6 @@ fn test_create_worktree_simple() -> Result<()> {
         Ok(())
     })
 }
-
 
 #[test]
 fn test_create_worktree_path_exists() -> Result<()> {

@@ -233,7 +233,7 @@ impl WorktreeStorage {
 
         let content = std::fs::read_to_string(&origin_mapping_file)?;
         let sanitized_branch = Self::sanitize_branch_name(branch_name);
-        
+
         for line in content.lines() {
             if let Some((branch, origin)) = line.split_once(" -> ") {
                 if branch == sanitized_branch {
@@ -250,11 +250,7 @@ impl WorktreeStorage {
     /// # Errors
     /// Returns an error if:
     /// - Failed to read or write the origin mapping file
-    pub fn remove_worktree_origin(
-        &self,
-        repo_name: &str,
-        branch_name: &str,
-    ) -> Result<()> {
+    pub fn remove_worktree_origin(&self, repo_name: &str, branch_name: &str) -> Result<()> {
         let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
 
         if !origin_mapping_file.exists() {
@@ -263,7 +259,7 @@ impl WorktreeStorage {
 
         let content = std::fs::read_to_string(&origin_mapping_file)?;
         let sanitized_branch = Self::sanitize_branch_name(branch_name);
-        
+
         // Filter out the line for this branch
         let new_content: String = content
             .lines()

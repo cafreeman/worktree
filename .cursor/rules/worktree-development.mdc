@@ -1,0 +1,68 @@
+---
+globs: src/main.rs,src/commands/*.rs,src/config/*.rs,*.toml
+alwaysApply: false
+---
+
+# Worktree CLI Development & Configuration
+
+## Command Structure
+
+The CLI uses clap with derive macros in [main.rs](mdc:src/main.rs):
+
+- `Commands` enum defines all subcommands
+- Each command has its own module in [commands/](mdc:src/commands/)
+- Command implementations return `anyhow::Result<()>`
+
+### Available Commands
+
+- `create` - Create new worktrees with branch management
+- `list` - List worktrees with filtering options
+- `remove` - Remove worktrees with optional branch deletion
+- `status` - Show comprehensive worktree status
+- `sync-config` - Synchronize config files between worktrees
+- `init` - Generate shell integration for directory navigation
+- `completions` - Generate shell completions
+- `jump` - Switch between worktrees (with interactive selection)
+- `back` - Return to previous worktree
+- `cleanup` - Clean up orphaned worktrees
+
+## Command Implementation Standards
+
+Each command module should:
+
+1. Export a main function matching the CLI signature
+2. Handle all error cases gracefully with meaningful messages
+3. Provide user-friendly output with progress indicators
+4. Follow storage conventions: `~/.worktrees/<repo-name>/<sanitized-branch-name>/`
+5. Use the GitOperations trait for Git interactions
+6. Use `#[arg(short, long)]` for common flags with meaningful help text
+
+## Configuration Management
+
+### Core Configuration Files
+
+- [Cargo.toml](mdc:Cargo.toml) - Dependencies and comprehensive lint configuration
+- [clippy.toml](mdc:clippy.toml) - Additional clippy settings (MSRV 1.70.0)
+- `.worktree-config.toml` - User-defined file copy patterns (optional)
+
+### .worktree-config.toml Structure
+
+```toml
+[copy-patterns]
+include = [".env*", ".vscode/", "*.local.json", "config/local/*", ".idea/"]
+exclude = ["node_modules/", "target/", ".git/", "*.log", "*.tmp", "dist/", "build/"]
+```
+
+### Default Copy Patterns
+
+When no config file exists:
+
+- **Include**: `.env*`, `.vscode/`, `*.local.json`, `config/local/*`
+- **Exclude**: `node_modules/`, `target/`, `.git/`, `*.log`, `*.tmp`
+
+### Configuration Guidelines
+
+- Use serde for TOML deserialization with fallback defaults
+- Support both include and exclude patterns using glob matching
+- Ensure excluded patterns take precedence over included ones
+- Store config parsing in [config/](mdc:src/config/) module

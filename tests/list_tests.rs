@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+
 use anyhow::Result;
 use worktree::commands::{
     create::{self, CreateMode},
@@ -66,4 +68,3 @@ fn test_list_worktrees_mixed_states() -> Result<()> {
         Ok(())
     })
 }
-

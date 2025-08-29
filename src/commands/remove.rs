@@ -67,7 +67,7 @@ fn resolve_target(
     repo_name: &str,
 ) -> Result<(std::path::PathBuf, String)> {
     use std::path::Path;
-    
+
     // Check if target is an absolute path
     let target_path = Path::new(target);
     if target_path.is_absolute() {
@@ -77,7 +77,9 @@ fn resolve_target(
             if let Some(branch_dir) = relative_path.file_name() {
                 if let Some(sanitized_name) = branch_dir.to_str() {
                     // Try to get the original branch name from the sanitized name
-                    if let Some(original_branch) = storage.get_original_branch_name(repo_name, sanitized_name)? {
+                    if let Some(original_branch) =
+                        storage.get_original_branch_name(repo_name, sanitized_name)?
+                    {
                         return Ok((target_path.to_path_buf(), original_branch));
                     } else {
                         // If no mapping exists, the sanitized name might be the original

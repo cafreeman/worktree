@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+
 use anyhow::Result;
 use worktree::commands::{
     create::{self, CreateMode},
@@ -122,7 +124,9 @@ fn test_remove_worktree_cleans_up_origin_info() -> Result<()> {
         assert!(worktree_path.exists());
 
         // Verify origin info exists
-        let origin_file = storage.get_repo_storage_dir("test_repo").join(".worktree-origins");
+        let origin_file = storage
+            .get_repo_storage_dir("test_repo")
+            .join(".worktree-origins");
         assert!(origin_file.exists());
         let content = std::fs::read_to_string(&origin_file)?;
         assert!(content.contains("feature-cleanup-test"));
@@ -156,7 +160,9 @@ fn test_remove_worktree_with_branch_deletion_cleans_up_origin() -> Result<()> {
         assert!(worktree_path.exists());
 
         // Verify origin info exists
-        let origin_file = storage.get_repo_storage_dir("test_repo").join(".worktree-origins");
+        let origin_file = storage
+            .get_repo_storage_dir("test_repo")
+            .join(".worktree-origins");
         assert!(origin_file.exists());
         let content = std::fs::read_to_string(&origin_file)?;
         assert!(content.contains("feature-delete-test"));
@@ -176,4 +182,3 @@ fn test_remove_worktree_with_branch_deletion_cleans_up_origin() -> Result<()> {
         Ok(())
     })
 }
-
