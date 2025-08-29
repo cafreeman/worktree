@@ -84,3 +84,4 @@ Strict linting is enforced with:
 - MSRV set to 1.70.0
 
 The codebase prioritizes safety, error handling, and maintainability with comprehensive error documentation and trait-based design for testability.
+- Clean up any stray files, directories, or git branches that you create while testing

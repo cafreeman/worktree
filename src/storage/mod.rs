@@ -166,4 +166,10 @@ impl WorktreeStorage {
 
         Ok(all_worktrees)
     }
+
+    /// Gets the storage directory for a specific repository
+    #[must_use]
+    pub fn get_repo_storage_dir(&self, repo_name: &str) -> PathBuf {
+        self.root_dir.join(repo_name)
+    }
 }

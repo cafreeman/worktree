@@ -25,10 +25,14 @@ pub fn generate_completions(shell: Shell, cmd: &mut Command) {
         Shell::Zsh => CompleteShell::Zsh,
         Shell::Fish => CompleteShell::Fish,
     };
-    
-    generate(clap_shell, cmd, cmd.get_name().to_string(), &mut io::stdout());
-}
 
+    generate(
+        clap_shell,
+        cmd,
+        cmd.get_name().to_string(),
+        &mut io::stdout(),
+    );
+}
 
 fn print_bash_integration() {
     println!(
@@ -43,10 +47,10 @@ worktree() {{
             local result
             if [ $# -eq 0 ]; then
                 # Interactive mode
-                result=$(worktree-bin jump --interactive 2>/dev/null)
+                result=$(worktree-bin jump --interactive)
             else
                 # Direct mode
-                result=$(worktree-bin jump "$@" 2>/dev/null)
+                result=$(worktree-bin jump "$@")
             fi
 
             if [ -n "$result" ]; then
@@ -60,51 +64,52 @@ worktree() {{
     esac
 }}
 
-# Load clap-generated completions for worktree-bin
-_worktree_bin_clap_complete() {{
-    local cur="${{COMP_WORDS[COMP_CWORD]}}"
-    
-    # Use clap-generated completions by calling worktree-bin with completion
-    local completions
-    completions=$(worktree-bin completions bash 2>/dev/null | bash -c 'source /dev/stdin && complete -p worktree-bin' 2>/dev/null)
-    
-    # Extract and execute the completion function
-    if [[ -n "$completions" ]]; then
-        eval "$completions"
-        # Call the clap-generated completion function
-        _worktree-bin
-        return 0
+# Load clap-generated completions
+_worktree_clap_available=false
+if command -v worktree-bin >/dev/null 2>&1; then
+    # Load clap completions and rename function to avoid conflicts
+    eval "$(worktree-bin completions bash 2>/dev/null)"
+    if declare -F _worktree >/dev/null 2>&1; then
+        eval "$(declare -f _worktree | sed 's/_worktree/_worktree_clap/')"
+        unset -f _worktree
+        _worktree_clap_available=true
     fi
-    
-    # Fallback to basic completion
-    COMPREPLY=($(compgen -W "create list remove status sync-config jump init completions --help --version" -- "$cur"))
-}}
+fi
 
-# Enhanced completion for the worktree shell function
+# Enhanced completion for the worktree shell function  
 _worktree_complete() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     local prev="${{COMP_WORDS[COMP_CWORD-1]}}"
 
+    # Handle jump subcommand specially
     if [ "${{COMP_WORDS[1]}}" = "jump" ]; then
-        # Special handling for jump subcommand
+        # Trigger interactive mode on empty tab
         if [ "${{#COMP_WORDS[@]}}" -eq 3 ] && [ -z "$cur" ]; then
-            # Launch interactive mode on TAB for empty jump
             worktree jump
             return 0
         fi
         
-        # Combine clap completions with custom jump completion
+        # Complete jump command
         if [[ "$cur" == -* ]]; then
-            # Complete flags using clap
-            _worktree_bin_clap_complete
+            # Complete flags for jump
+            COMPREPLY=($(compgen -W "--interactive --current --help" -- "$cur"))
         else
-            # Complete worktree names using custom logic
+            # Complete worktree names
             local worktrees=$(worktree-bin jump --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
     else
-        # Use clap-generated completions for all other commands
-        _worktree_bin_clap_complete
+        # For all other commands, delegate to clap completion if available
+        if [ "$_worktree_clap_available" = "true" ] && declare -F _worktree_clap >/dev/null 2>&1; then
+            # Temporarily modify COMP_WORDS to make it look like worktree-bin
+            local saved_comp_words=("${{COMP_WORDS[@]}}")
+            COMP_WORDS[0]="worktree-bin"
+            _worktree_clap
+            COMP_WORDS=("${{saved_comp_words[@]}}")
+        else
+            # Fallback to basic completion
+            COMPREPLY=($(compgen -W "create list remove status sync-config jump init completions cleanup --help --version" -- "$cur"))
+        fi
     fi
 }}
 
@@ -125,10 +130,10 @@ worktree() {{
             local result
             if [ $# -eq 0 ]; then
                 # Interactive mode
-                result=$(worktree-bin jump --interactive 2>/dev/null)
+                result=$(worktree-bin jump --interactive)
             else
                 # Direct mode
-                result=$(worktree-bin jump "$@" 2>/dev/null)
+                result=$(worktree-bin jump "$@")
             fi
 
             if [ -n "$result" ]; then
@@ -142,66 +147,92 @@ worktree() {{
     esac
 }}
 
-# Load clap-generated completion for worktree-bin
-_worktree_bin_clap_complete() {{
-    # Generate and source clap completions
-    local completion_script
-    completion_script=$(worktree-bin completions zsh 2>/dev/null)
-    
-    if [[ -n "$completion_script" ]]; then
-        # Temporarily define the clap completion
-        eval "$completion_script"
-        # Call the generated completion function
-        _worktree-bin
-    else
-        # Fallback completion
-        local -a subcommands
-        subcommands=(
-            'create:Create a new worktree'
-            'list:List all worktrees'
-            'remove:Remove a worktree'
-            'status:Show worktree status'
-            'sync-config:Sync config files between worktrees'
-            'jump:Jump to a worktree directory'
-            'init:Generate shell integration'
-            'completions:Generate shell completions'
-        )
-        _describe 'commands' subcommands
-    fi
-}}
+# Load clap-generated completions
+_worktree_clap_available=false
+if command -v worktree-bin >/dev/null 2>&1; then
+    # Load clap completions but strip the problematic conditional registration at the end
+    # Using a function to avoid 'local' at the top level which prints during sourcing
+    __worktree_load_completions() {{
+        local clap_completion
+        clap_completion="$(worktree-bin completions zsh 2>/dev/null | sed '/^if \[ "$funcstack\[1\]" = "_worktree" \]; then/,/^fi$/d')"
+        if [[ -n "$clap_completion" ]]; then
+            eval "$clap_completion"
+            if (( $+functions[_worktree] )); then
+                functions[_worktree_clap]=${{functions[_worktree]}}
+                unfunction _worktree
+                _worktree_clap_available=true
+            fi
+        fi
+    }}
+    __worktree_load_completions
+    unfunction __worktree_load_completions
+fi
 
-# Enhanced Zsh completion that triggers interactive mode on TAB
+# Create our custom _worktree function for the shell wrapper
 _worktree() {{
-    local state line
+    local line state context curcontext="$curcontext"
+    typeset -A opt_args
     
-    if [ ${{#words[@]}} -eq 2 ]; then
-        # Use clap-generated completions for subcommands
-        _worktree_bin_clap_complete
-    elif [ "${{words[2]}}" = "jump" ]; then
-        # Special handling for jump arguments
-        if [ ${{#words[@]}} -eq 3 ] && [ -z "${{words[3]}}" ]; then
-            # Launch interactive mode for empty jump completion
-            worktree jump
-            return 0
-        fi
-        
-        # Check if current word is a flag
-        if [[ "${{words[CURRENT]}}" == -* ]]; then
-            # Use clap completions for flags
-            _worktree_bin_clap_complete
-        else
-            # Use custom completion for worktree names
-            local -a worktrees
-            worktrees=($(worktree-bin jump --list-completions 2>/dev/null))
-            _describe 'worktrees' worktrees
-        fi
-    else
-        # Use clap-generated completions for other subcommands
-        _worktree_bin_clap_complete
-    fi
+    case "${{words[2]}}" in
+        jump)
+            # Handle jump subcommand specially
+            if [[ ${{#words[@]}} -le 3 && "${{words[CURRENT]}}" != -* ]]; then
+                # Complete worktree names for jump command
+                local -a worktrees
+                worktrees=($(worktree-bin jump --list-completions 2>/dev/null))
+                if [[ ${{#worktrees[@]}} -gt 0 ]]; then
+                    _describe 'worktrees' worktrees
+                else
+                    _message 'no worktrees available'
+                fi
+                return 0
+            elif [[ "${{words[CURRENT]}}" == -* ]]; then
+                # Complete flags for jump command
+                _arguments -s : \
+                    '--interactive[Launch interactive selection mode]' \
+                    '--current[Current repo only]' \
+                    '--help[Print help]' \
+                    '-h[Print help]'
+                return 0
+            fi
+            ;;
+        *)
+            # For all other commands, delegate to clap completions if available
+            if [[ "$_worktree_clap_available" = "true" ]]; then
+                # Modify the first word to be worktree-bin for delegation
+                local original_words=("${{words[@]}}")
+                words[1]="worktree-bin"
+                _worktree_clap "$@"
+                local result=$?
+                words=("${{original_words[@]}}")
+                return $result
+            else
+                # Fallback: basic subcommand completion
+                if [[ ${{#words[@]}} -eq 2 ]]; then
+                    local -a subcommands
+                    subcommands=(
+                        'create:Create a new worktree'
+                        'list:List all worktrees'  
+                        'remove:Remove a worktree'
+                        'status:Show worktree status'
+                        'sync-config:Sync config files between worktrees'
+                        'jump:Jump to a worktree directory'
+                        'init:Generate shell integration'
+                        'completions:Generate shell completions'
+                        'cleanup:Clean up orphaned branches and worktree references'
+                    )
+                    _describe 'worktree commands' subcommands
+                    return 0
+                fi
+            fi
+            ;;
+    esac
 }}
 
-compdef _worktree worktree"#
+# Register the completion (only if compinit has been called)
+if (( $+functions[compdef] )); then
+    compdef _worktree worktree
+fi"#
     );
 }
 
@@ -218,10 +249,10 @@ function worktree
             set result
             if test (count $argv) -eq 0
                 # Interactive mode
-                set result (worktree-bin jump --interactive 2>/dev/null)
+                set result (worktree-bin jump --interactive)
             else
                 # Direct mode
-                set result (worktree-bin jump $argv 2>/dev/null)
+                set result (worktree-bin jump $argv)
             end
 
             if test -n "$result"
@@ -234,22 +265,13 @@ function worktree
 end
 
 # Load clap-generated Fish completions
-function _worktree_load_clap_completions
-    # Generate clap completions and load them
-    set -l completion_script (worktree-bin completions fish 2>/dev/null)
-    if test -n "$completion_script"
-        # Source the clap-generated completions
-        echo "$completion_script" | source
-    end
+if command -q worktree-bin
+    eval (worktree-bin completions fish 2>/dev/null)
 end
 
-# Load the clap completions when this script is sourced
-_worktree_load_clap_completions
-
-# Enhanced Fish completion for worktree with custom jump logic
-# Override the jump completion to add custom worktree name completion
+# Override only the jump argument completion to add custom worktree names
 complete -c worktree -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
 
-# Note: The clap-generated completions will handle all other subcommands and flags"#
+# The clap-generated completions handle all other subcommands and flags"#
     );
 }

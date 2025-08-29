@@ -27,16 +27,16 @@ sudo cp target/release/worktree-bin /usr/local/bin/
 cp target/release/worktree-bin ~/.local/bin/  # ensure ~/.local/bin is in PATH
 ```
 
-### 2. Set Up Shell Integration
+### 2. Set Up Shell Integration with Completions
 
-The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and enhanced completions. You need to set this up for your shell:
+The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and provides enhanced tab completions automatically. Add the following to your shell configuration:
 
 #### Bash
 
 Add to your `~/.bashrc` or `~/.bash_profile`:
 
 ```bash
-# Generate and source worktree shell integration
+# Generate and source worktree shell integration with completions
 eval "$(worktree-bin init bash)"
 ```
 
@@ -45,7 +45,7 @@ eval "$(worktree-bin init bash)"
 Add to your `~/.zshrc`:
 
 ```bash
-# Generate and source worktree shell integration
+# Generate and source worktree shell integration with completions
 eval "$(worktree-bin init zsh)"
 ```
 
@@ -54,36 +54,16 @@ eval "$(worktree-bin init zsh)"
 Add to your Fish config (`~/.config/fish/config.fish`):
 
 ```fish
-# Generate and source worktree shell integration
+# Generate and source worktree shell integration with completions
 worktree-bin init fish | source
 ```
 
-### 3. Enable Shell Completions (Optional)
+**Note:** The shell integration automatically includes intelligent tab completions that:
+- Complete subcommands and flags using clap-generated completions
+- Complete worktree names for `jump` command using live data
+- Trigger interactive selection when pressing TAB on empty `worktree jump`
 
-For enhanced tab completions, add these to your shell config:
-
-#### Bash
-
-```bash
-# Add to ~/.bashrc
-eval "$(worktree-bin completions bash)"
-```
-
-#### Zsh
-
-```bash
-# Add to ~/.zshrc  
-eval "$(worktree-bin completions zsh)"
-```
-
-#### Fish
-
-```fish
-# Add to ~/.config/fish/config.fish
-worktree-bin completions fish | source
-```
-
-### 4. Reload Your Shell
+### 3. Reload Your Shell
 
 ```bash
 # Reload your shell configuration
@@ -119,6 +99,12 @@ worktree list
 
 # List worktrees for current repo only
 worktree list --current
+
+# Jump to a worktree (changes directory)
+worktree jump feature/auth
+
+# Interactive worktree selection
+worktree jump --interactive
 
 # Remove a worktree
 worktree remove feature/auth
@@ -223,6 +209,33 @@ worktree sync-config main feature/auth
 
 # Sync using paths
 worktree sync-config ~/.worktrees/project/main ~/.worktrees/project/feature
+```
+
+### `jump` - Navigate to a worktree directory
+
+```bash
+worktree jump [target] [OPTIONS]
+```
+
+**Options:**
+
+- `--interactive` - Launch interactive selection mode
+- `--current` - Show worktrees for current repo only
+
+**Examples:**
+
+```bash
+# Jump to a specific worktree
+worktree jump feature/auth
+
+# Interactive selection (also triggered by pressing TAB on empty jump)
+worktree jump --interactive
+
+# Jump with tab completion - type partial name and press TAB
+worktree jump feat<TAB>  # completes to available worktrees
+
+# Current repo worktrees only
+worktree jump --current
 ```
 
 ## Configuration
