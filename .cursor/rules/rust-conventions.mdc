@@ -1,0 +1,41 @@
+---
+globs: *.rs
+---
+
+# Rust Code Conventions
+
+## Error Handling
+
+- Use `anyhow::Result` for all fallible operations (imported as `Result` in lib.rs)
+- Follow clippy lints: `unwrap_used = "deny"`, `expect_used = "warn"`, `panic = "deny"`
+- Document errors with `#[doc = "# Errors"]` sections as enforced by `missing_errors_doc = "warn"`
+
+## Code Quality
+
+- Prefer `?` operator over unwrap/expect
+- Use meaningful error messages with context
+- Follow pedantic lints: `must_use_candidate`, `needless_pass_by_value`
+- Keep functions under 100 lines (`too-many-lines-threshold = 100`)
+- Maintain cognitive complexity under 30 (`cognitive-complexity-threshold = 30`)
+
+## Dependencies
+
+- Use git2 for Git operations
+- Use clap with derive feature for CLI parsing
+- Use serde + toml for configuration
+- Use dirs for cross-platform directory handling
+- Use anyhow for error handling
+
+## Testing
+
+- Use tempfile and temp-env for isolated test environments
+- Test all command modules in [tests/](mdc:tests/)
+- Use the GitOperations trait for mocking in tests
+
+## Module Structure
+
+Each command should be in its own file in [commands/](mdc:src/commands/) with:
+
+- Clear function signatures
+- Proper error handling
+- Integration with the main CLI in [main.rs](mdc:src/main.rs)

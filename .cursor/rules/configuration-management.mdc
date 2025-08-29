@@ -1,0 +1,58 @@
+---
+globs: src/config/*.rs,*.toml,.worktree-config.toml
+---
+
+# Configuration Management
+
+## Project Configuration Files
+
+- [Cargo.toml](mdc:Cargo.toml) - Project dependencies and lint configuration
+- [clippy.toml](mdc:clippy.toml) - Additional clippy settings with MSRV 1.70.0
+- `.worktree-config.toml` - User-defined file copy patterns (optional)
+
+## .worktree-config.toml Structure
+
+User-configurable file in repository root for customizing worktree behavior:
+
+```toml
+[copy-patterns]
+include = [
+    ".env*",
+    ".vscode/",
+    "*.local.json",
+    "config/local/*",
+    ".idea/",
+    "docker-compose.override.yml"
+]
+exclude = [
+    "node_modules/",
+    "target/",
+    ".git/",
+    "*.log",
+    "*.tmp",
+    "dist/",
+    "build/"
+]
+```
+
+## Default Patterns
+
+When no config file exists, use sensible defaults:
+
+- **Include**: `.env*`, `.vscode/`, `*.local.json`, `config/local/*`
+- **Exclude**: `node_modules/`, `target/`, `.git/`, `*.log`, `*.tmp`
+
+## Configuration Module Guidelines
+
+- Use serde for TOML deserialization
+- Provide fallback defaults when config file is missing
+- Validate configuration patterns
+- Handle configuration errors gracefully
+- Support both include and exclude patterns using glob matching
+
+## Implementation Notes
+
+- Use the `glob` crate for pattern matching
+- Store config parsing in [config/](mdc:src/config/) module
+- Support relative paths in patterns
+- Ensure excluded patterns take precedence over included ones

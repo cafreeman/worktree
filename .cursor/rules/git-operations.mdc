@@ -1,0 +1,51 @@
+---
+globs: src/git/*.rs,src/traits.rs
+---
+
+# Git Operations Guidelines
+
+## GitOperations Trait
+
+The [GitOperations trait](mdc:src/traits.rs) provides an abstraction over git2 operations for testability:
+
+- `open(path)` - Open a repository
+- `branch_exists(name)` - Check if branch exists
+- `create_worktree(branch, path, create_branch)` - Create new worktree
+- `remove_worktree(name)` - Remove existing worktree
+- `list_worktrees()` - List all worktrees
+- `delete_branch(name)` - Delete a branch
+
+## Error Handling
+
+- All methods return `anyhow::Result<T>`
+- Provide detailed error context for git operations
+- Handle common git errors gracefully
+- Document error conditions in function docs
+
+## Implementation Guidelines
+
+- Use git2 crate for actual Git operations
+- Wrap git2 errors with meaningful context
+- Implement proper resource cleanup
+- Handle edge cases (missing repositories, invalid branches, etc.)
+
+## Testing Strategy
+
+- Create mock implementations of GitOperations for testing
+- Test both successful operations and error conditions
+- Use temporary Git repositories in tests
+- Verify Git state after operations
+
+## Common Patterns
+
+```rust
+use anyhow::{Context, Result};
+use git2::Repository;
+
+fn git_operation() -> Result<()> {
+    let repo = Repository::open(path)
+        .context("Failed to open git repository")?;
+    // ... git operations
+    Ok(())
+}
+```
