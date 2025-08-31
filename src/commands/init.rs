@@ -1,5 +1,5 @@
 use clap::{Command, ValueEnum};
-use clap_complete::{generate, Shell as CompleteShell};
+use clap_complete::{Shell as CompleteShell, generate};
 use std::io;
 
 #[derive(ValueEnum, Clone, Copy)]

@@ -1,7 +1,7 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use worktree::Result;
 use worktree::commands::init::Shell;
 use worktree::commands::{back, cleanup, create, init, jump, list, remove, status, sync_config};
-use worktree::Result;
 
 #[derive(Parser)]
 #[command(name = "worktree")]

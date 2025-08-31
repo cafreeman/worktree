@@ -70,7 +70,8 @@ fn create_worktree_internal(
             if branch_exists {
                 anyhow::bail!(
                     "Branch '{}' already exists. Use 'worktree create {}' (without --new-branch) to create a worktree for it",
-                    branch, branch
+                    branch,
+                    branch
                 );
             }
         }
@@ -78,7 +79,8 @@ fn create_worktree_internal(
             if !branch_exists {
                 anyhow::bail!(
                     "Branch '{}' doesn't exist. Use 'worktree create {}' (without --existing-branch) to create it",
-                    branch, branch
+                    branch,
+                    branch
                 );
             }
         }
