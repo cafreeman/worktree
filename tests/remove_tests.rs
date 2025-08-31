@@ -112,7 +112,7 @@ fn test_remove_nonexistent_worktree() -> Result<()> {
     env.run_command(&["remove", "nonexistent"])?
         .assert()
         .failure()
-        .stderr(predicate::str::contains("does not exist"));
+        .stderr(predicate::str::contains("No worktree found"));
 
     Ok(())
 }
@@ -167,3 +167,30 @@ fn test_interactive_remove_with_confirmation() -> Result<()> {
     Ok(())
 }
 */
+
+/// Test remove command with sanitized names and branch deletion edge cases
+#[test]
+fn test_remove_sanitized_name_branch_deletion() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Create a worktree with characters that require sanitization
+    env.run_command(&["create", "feature/test-branch"])?
+        .assert()
+        .success();
+
+    // Verify the worktree was created
+    let worktree_path = env.worktree_path("feature/test-branch");
+    worktree_path.assert(predicate::path::is_dir());
+
+    // Remove the worktree (this tests the branch name resolution fix)
+    // The command should properly resolve the canonical branch name even
+    // when the filesystem directory uses a sanitized name
+    env.run_command(&["remove", "feature/test-branch"])?
+        .assert()
+        .success();
+
+    // Verify the worktree was removed
+    worktree_path.assert(predicate::path::missing());
+
+    Ok(())
+}

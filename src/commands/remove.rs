@@ -141,14 +141,52 @@ fn resolve_target(
         anyhow::bail!("Invalid worktree path: {}", target);
     }
 
-    // Try target as original branch name first
-    let worktree_path = storage.get_worktree_path(repo_name, target);
-    if worktree_path.exists() {
-        return Ok((worktree_path, target.to_string()));
+    // Helper function to check if target contains characters that would be sanitized
+    let contains_special_chars = |s: &str| {
+        s.chars().any(|c| matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+    };
+
+    // If target contains special characters, it's likely a canonical branch name
+    if contains_special_chars(target) {
+        let worktree_path = storage.get_worktree_path(repo_name, target);
+        if worktree_path.exists() {
+            return Ok((worktree_path, target.to_string()));
+        }
+        anyhow::bail!("No worktree found for branch '{}'", target);
     }
 
-    // If that doesn't exist, maybe target is already a sanitized name
-    // Check if there's a mapping from this sanitized name to an original
+    // Target doesn't contain special chars - it could be either canonical or sanitized
+    // Try as canonical first
+    let worktree_path = storage.get_worktree_path(repo_name, target);
+    if worktree_path.exists() {
+        // Check if there's a mapping that shows this is actually a sanitized name
+        if let Some(original_branch) = storage.get_original_branch_name(repo_name, target)? {
+            // Target is sanitized, return the original branch name
+            return Ok((worktree_path, original_branch));
+        }
+        
+        // No mapping found - check if the branch actually exists in git
+        // If git has a branch with this exact name, then target is canonical
+        let current_dir = std::env::current_dir()?;
+        if let Ok(git_repo) = crate::git::GitRepo::open(&current_dir) {
+            if let Ok(branches) = git_repo.list_local_branches() {
+                if branches.contains(&target.to_string()) {
+                    // Git has a branch with this exact name, so target is canonical
+                    return Ok((worktree_path, target.to_string()));
+                }
+            }
+        }
+        
+        // Git doesn't have a branch with this name, so target is likely sanitized
+        // but we can't resolve it without the mapping - error out for safety
+        anyhow::bail!(
+            "Cannot determine canonical branch name for '{}'. The branch mapping file may be missing or corrupted. \
+             Please specify the full branch name (e.g., 'feature/branch-name' instead of 'feature-branch-name')",
+            target
+        );
+    }
+
+    // Target doesn't exist as canonical, try as sanitized with mapping lookup
     if let Some(original_branch) = storage.get_original_branch_name(repo_name, target)? {
         let path = storage.get_worktree_path(repo_name, &original_branch);
         if path.exists() {
@@ -156,8 +194,7 @@ fn resolve_target(
         }
     }
 
-    // Fallback: use target as-is (might be a sanitized name without mapping)
-    Ok((worktree_path, target.to_string()))
+    anyhow::bail!("No worktree found matching '{}'", target);
 }
 
 fn list_worktree_completions(storage: &WorktreeStorage, current_repo_only: bool) -> Result<()> {

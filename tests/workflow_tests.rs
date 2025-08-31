@@ -282,7 +282,7 @@ fn test_error_recovery_workflow() -> Result<()> {
     env.run_command(&["remove", "nonexistent"])?
         .assert()
         .failure()
-        .stderr(predicate::str::contains("does not exist"));
+        .stderr(predicate::str::contains("No worktree found"));
 
     env.run_command(&["sync-config", "nonexistent", "feature/success"])?
         .assert()
