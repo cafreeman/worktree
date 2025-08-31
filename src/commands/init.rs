@@ -106,6 +106,22 @@ _worktree_complete() {{
             local worktrees=$(worktree-bin jump --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
+    elif [ "${{COMP_WORDS[1]}}" = "remove" ]; then
+        # Trigger interactive mode on empty tab
+        if [ "${{#COMP_WORDS[@]}}" -eq 3 ] && [ -z "$cur" ]; then
+            worktree remove --interactive
+            return 0
+        fi
+        
+        # Complete remove command
+        if [[ "$cur" == -* ]]; then
+            # Complete flags for remove
+            COMPREPLY=($(compgen -W "--interactive --current --keep-branch --help" -- "$cur"))
+        else
+            # Complete worktree names
+            local worktrees=$(worktree-bin remove --list-completions 2>/dev/null)
+            COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
+        fi
     else
         # For all other commands, delegate to clap completion if available
         if [ "$_worktree_clap_available" = "true" ] && declare -F _worktree_clap >/dev/null 2>&1; then
@@ -212,6 +228,29 @@ _worktree() {{
                 return 0
             fi
             ;;
+        remove)
+            # Handle remove subcommand specially
+            if [[ ${{#words[@]}} -le 3 && "${{words[CURRENT]}}" != -* ]]; then
+                # Complete worktree names for remove command
+                local -a worktrees
+                worktrees=($(worktree-bin remove --list-completions 2>/dev/null))
+                if [[ ${{#worktrees[@]}} -gt 0 ]]; then
+                    _describe 'worktrees' worktrees
+                else
+                    _message 'no worktrees available'
+                fi
+                return 0
+            elif [[ "${{words[CURRENT]}}" == -* ]]; then
+                # Complete flags for remove command
+                _arguments -s : \
+                    '--interactive[Launch interactive selection mode]' \
+                    '--current[Current repo only]' \
+                    '--keep-branch[Keep the branch (only remove the worktree)]' \
+                    '--help[Print help]' \
+                    '-h[Print help]'
+                return 0
+            fi
+            ;;
         *)
             # For all other commands, delegate to clap completions if available
             if [[ "$_worktree_clap_available" = "true" ]]; then
@@ -292,8 +331,9 @@ if command -q worktree-bin
     eval (worktree-bin completions fish 2>/dev/null)
 end
 
-# Override only the jump argument completion to add custom worktree names
+# Override the jump and remove argument completions to add custom worktree names
 complete -c worktree -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c worktree -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
 
 # The clap-generated completions handle all other subcommands and flags"#
     );

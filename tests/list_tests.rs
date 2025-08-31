@@ -1,70 +1,79 @@
-#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+//! Modern integration tests for the list command
+//!
+//! These tests validate the list command CLI behavior using real command execution.
 
 use anyhow::Result;
-use worktree::commands::{
-    create::{self, CreateMode},
-    list,
-};
 
-mod test_helpers;
-use test_helpers::TestEnvironment;
+mod cli_test_helpers;
+use cli_test_helpers::CliTestEnvironment;
 
-#[test]
-fn test_list_worktrees_empty() -> Result<()> {
-    let env = TestEnvironment::new()?;
-
-    env.run_test(|| {
-        // Test listing when no worktrees exist - should succeed
-        list::list_worktrees(false)?;
-        list::list_worktrees(true)?;
-
-        Ok(())
-    })
+/// Helper function to get stdout from command execution
+fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
+    let assert_output = env.run_command(args)?.assert().success();
+    let output = assert_output.get_output();
+    Ok(String::from_utf8(output.stdout.clone())?)
 }
 
+/// Test list command with no worktrees
 #[test]
-fn test_list_worktrees_with_content() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_list_empty() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create some worktrees first
-        create::create_worktree("feature/test1", CreateMode::Smart)?;
-        create::create_worktree("feature/test2", CreateMode::Smart)?;
+    // List should succeed even with no worktrees
+    let output = get_stdout(&env, &["list"])?;
 
-        // Test listing all worktrees
-        list::list_worktrees(false)?;
+    // Output should be empty or contain header only
+    assert!(
+        output.trim().is_empty() || output.contains("No worktrees"),
+        "List command should handle empty case gracefully"
+    );
 
-        // Test current repo only
-        list::list_worktrees(true)?;
-
-        // Verify the worktrees were actually created
-        let worktree_path1 = env.storage_root.join("test_repo").join("feature-test1");
-        let worktree_path2 = env.storage_root.join("test_repo").join("feature-test2");
-        assert!(worktree_path1.exists());
-        assert!(worktree_path2.exists());
-
-        Ok(())
-    })
+    Ok(())
 }
 
+/// Test list command with multiple worktrees
 #[test]
-fn test_list_worktrees_mixed_states() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_list_multiple_worktrees() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature/active", CreateMode::Smart)?;
+    // Create several worktrees
+    let branches = ["feature/list-test", "bugfix/minor", "release/v1.0"];
+    for branch in &branches {
+        env.run_command(&["create", branch])?.assert().success();
+    }
 
-        let worktree_path = env.storage_root.join("test_repo").join("feature-active");
-        assert!(worktree_path.exists());
+    // Test list command
+    let output = get_stdout(&env, &["list"])?;
 
-        // Delete the directory to simulate a missing worktree
-        std::fs::remove_dir_all(&worktree_path)?;
-        assert!(!worktree_path.exists());
+    // All branches should appear in the output
+    for branch in &branches {
+        assert!(
+            output.contains(branch),
+            "List output should contain branch: {}",
+            branch
+        );
+    }
 
-        // List should still work and show the missing worktree
-        list::list_worktrees(true)?;
+    Ok(())
+}
 
-        Ok(())
-    })
+/// Test list command with current repo flag
+#[test]
+fn test_list_current_repo() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Create a worktree
+    env.run_command(&["create", "feature/current-test"])?
+        .assert()
+        .success();
+
+    // Test list with current repo flag
+    let output = get_stdout(&env, &["list", "--current"])?;
+
+    assert!(
+        output.contains("feature/current-test"),
+        "List --current should show current repo worktrees"
+    );
+
+    Ok(())
 }

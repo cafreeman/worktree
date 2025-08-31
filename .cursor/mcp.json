@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "codanna": {
+      "command": "codanna",
+      "args": ["serve", "--watch"]
+    },
+    "foundry": {
+      "command": "foundry",
+      "args": ["serve"]
+    }
+  }
+}

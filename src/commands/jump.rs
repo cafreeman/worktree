@@ -1,8 +1,8 @@
 use anyhow::Result;
-use inquire::Select;
 use std::path::PathBuf;
 
 use crate::git::GitRepo;
+use crate::selection::{RealSelectionProvider, SelectionProvider, extract_path_from_selection};
 use crate::storage::WorktreeStorage;
 
 /// Jump to a worktree directory
@@ -19,6 +19,30 @@ pub fn jump_worktree(
     list_completions: bool,
     current_repo_only: bool,
 ) -> Result<()> {
+    jump_worktree_with_provider(
+        target,
+        interactive,
+        list_completions,
+        current_repo_only,
+        &RealSelectionProvider,
+    )
+}
+
+/// Jump to a worktree directory with a custom selection provider (for testing)
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to access the storage system
+/// - Failed to determine current repository
+/// - Git operations fail
+/// - Interactive selection fails
+pub fn jump_worktree_with_provider(
+    target: Option<&str>,
+    interactive: bool,
+    list_completions: bool,
+    current_repo_only: bool,
+    provider: &dyn SelectionProvider,
+) -> Result<()> {
     let storage = WorktreeStorage::new()?;
 
     if list_completions {
@@ -27,7 +51,7 @@ pub fn jump_worktree(
     }
 
     let target_path = if interactive || target.is_none() {
-        select_worktree_interactive(&storage, current_repo_only)?
+        select_worktree_interactive(&storage, current_repo_only, provider)?
     } else if let Some(target_name) = target {
         find_worktree_by_name(&storage, target_name, current_repo_only)?
     } else {
@@ -54,6 +78,7 @@ fn list_worktree_completions(storage: &WorktreeStorage, current_repo_only: bool)
 fn select_worktree_interactive(
     storage: &WorktreeStorage,
     current_repo_only: bool,
+    provider: &dyn SelectionProvider,
 ) -> Result<PathBuf> {
     let worktrees = get_available_worktrees(storage, current_repo_only)?;
 
@@ -67,18 +92,10 @@ fn select_worktree_interactive(
         .map(|(repo, branch, path)| format!("{}/{} ({})", repo, branch, path.display()))
         .collect();
 
-    let selection = Select::new("Jump to worktree:", options)
-        .with_page_size(10)
-        .with_vim_mode(true)
-        .prompt()?;
+    let selection = provider.select("Jump to worktree:", options)?;
 
-    // Extract path from selection
-    if let Some(path_start) = selection.rfind(" (") {
-        let path_str = &selection[path_start + 2..selection.len() - 1];
-        Ok(PathBuf::from(path_str))
-    } else {
-        anyhow::bail!("Invalid selection format")
-    }
+    // Extract path from selection using helper function
+    extract_path_from_selection(&selection)
 }
 
 fn find_worktree_by_name(

@@ -34,11 +34,13 @@
 //! - [`storage`] - Manages worktree storage in `~/.worktrees/` with branch name sanitization
 //! - [`config`] - Handles `.worktree-config.toml` files for customizing file copy patterns
 //! - [`git`] - Git operations wrapper using git2 crate
+//! - [`selection`] - Abstracts interactive selection prompts for testability
 //! - [`traits`] - Defines GitOperations trait for testability and abstraction
 
 pub mod commands;
 pub mod config;
 pub mod git;
+pub mod selection;
 pub mod storage;
 pub mod traits;
 

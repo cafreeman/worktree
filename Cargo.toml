@@ -12,12 +12,17 @@ keywords = ["git", "worktree", "cli", "development", "branch"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["Chris Freeman <cfreeman.code@gmail.com>"]
 exclude = [
+    "/.claude/",
+    "/.codanna/",
+    "/.codannaignore",
+    "/.cursor/",
+    "/.fastembed_cache/",
     "/.github/",
     "/tests/",
     "/.gitignore",
     "/release.toml",
     "/CLAUDE.md",
-    "/SHELL_INTEGRATION.md"
+    "/SHELL_INTEGRATION.md",
 ]
 
 [[bin]]
@@ -38,6 +43,10 @@ inquire = "0.7"
 [dev-dependencies]
 tempfile = "3.8"
 temp-env = "0.3"
+rexpect = "0.5"
+assert_fs = "1.1"
+predicates = "3.1"
+assert_cmd = "2.0"
 
 [lints.clippy]
 # Deny common footguns that can cause runtime panics

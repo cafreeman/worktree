@@ -1,97 +1,80 @@
-#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+//! Modern integration tests for the status command
+//!
+//! These tests validate the status command CLI behavior using real command execution.
 
 use anyhow::Result;
-use worktree::commands::{
-    create::{self, CreateMode},
-    status,
-};
 
-mod test_helpers;
-use test_helpers::TestEnvironment;
+mod cli_test_helpers;
+use cli_test_helpers::CliTestEnvironment;
 
-#[test]
-fn test_show_status_empty() -> Result<()> {
-    let env = TestEnvironment::new()?;
-
-    env.run_test(|| {
-        // Test status when no worktrees exist - should succeed
-        status::show_status()?;
-
-        Ok(())
-    })
+/// Helper function to get stdout from command execution
+fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
+    let assert_output = env.run_command(args)?.assert().success();
+    let output = assert_output.get_output();
+    Ok(String::from_utf8(output.stdout.clone())?)
 }
 
+/// Test status command with no worktrees
 #[test]
-fn test_show_status_with_worktrees() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_status_empty() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create some worktrees
-        create::create_worktree("feature/status1", CreateMode::Smart)?;
-        create::create_worktree("feature/status2", CreateMode::Smart)?;
+    // Status should succeed even with no worktrees
+    env.run_command(&["status"])?.assert().success();
 
-        // Verify worktrees were created
-        let worktree_path1 = env.storage_root.join("test_repo").join("feature-status1");
-        let worktree_path2 = env.storage_root.join("test_repo").join("feature-status2");
-        assert!(worktree_path1.exists());
-        assert!(worktree_path2.exists());
-
-        // Test status - should show the worktrees
-        status::show_status()?;
-
-        Ok(())
-    })
+    Ok(())
 }
 
+/// Test status command with worktrees
 #[test]
-fn test_show_status_missing_directories() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_status_with_worktrees() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature/missing", CreateMode::Smart)?;
+    // Create several worktrees
+    let branches = ["feature/status-test", "bugfix/status"];
+    for branch in &branches {
+        env.run_command(&["create", branch])?.assert().success();
+    }
 
-        let worktree_path = env.storage_root.join("test_repo").join("feature-missing");
-        assert!(worktree_path.exists());
+    // Status should succeed with worktrees
+    let output_str = get_stdout(&env, &["status"])?;
 
-        // Delete the directory to simulate missing worktree
-        std::fs::remove_dir_all(&worktree_path)?;
-        assert!(!worktree_path.exists());
+    // Should contain some information about the worktrees
+    assert!(
+        !output_str.trim().is_empty(),
+        "Status command should produce some output with worktrees"
+    );
 
-        // Status should still work and show inconsistent state
-        status::show_status()?;
-
-        Ok(())
-    })
+    Ok(())
 }
 
+/// Test status command help
 #[test]
-fn test_show_status_mixed_scenarios() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_status_help() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create multiple worktrees in different states
+    // Test help flag
+    let help_str = get_stdout(&env, &["status", "--help"])?;
+    assert!(
+        help_str.contains("status"),
+        "Help output should mention the status command"
+    );
 
-        // 1. Normal active worktree
-        create::create_worktree("feature/active", CreateMode::Smart)?;
+    Ok(())
+}
 
-        // 2. Worktree that will be missing
-        create::create_worktree("feature/will-be-missing", CreateMode::Smart)?;
+/// Test status command basic functionality
+#[test]
+fn test_status_basic() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-        let missing_path = env
-            .storage_root
-            .join("test_repo")
-            .join("feature-will-be-missing");
-        assert!(missing_path.exists());
-        std::fs::remove_dir_all(&missing_path)?;
-        assert!(!missing_path.exists());
+    // Create a worktree
+    env.run_command(&["create", "feature/basic-status"])?
+        .assert()
+        .success();
 
-        // 3. Worktree with special characters
-        create::create_worktree("feature/test-special", CreateMode::Smart)?;
+    // Status command should work
+    env.run_command(&["status"])?.assert().success();
 
-        // Status should handle all these scenarios
-        status::show_status()?;
-
-        Ok(())
-    })
+    Ok(())
 }

@@ -1,0 +1,78 @@
+---
+globs: ['**/*.rs', '**/Cargo.toml', '**/.cargo/config.toml']
+---
+
+# Rust Development Standards
+
+## Code Quality & Style
+
+### Functional Programming (STRONGLY PREFERRED)
+
+- **USE**: `map()`, `filter()`, `collect()`, `fold()`, `find()`, `any()`, `all()`
+- **AVOID**: `for` loops with mutable state, `mut` variables unless necessary
+- **PREFER**: `iter().map().collect()` over imperative collection building
+
+```rust
+// ✅ Functional (Prefer)
+let content = tasks.iter()
+    .filter(|task| task.status == TaskStatus::Completed)
+    .map(|task| format!("- {}\n", task.title))
+    .collect::<String>();
+
+// ❌ Imperative (Avoid)
+let mut content = String::new();
+for task in &tasks {
+    if task.status == TaskStatus::Completed {
+        content.push_str(&format!("- {}\n", task.title));
+    }
+}
+```
+
+### Error Handling
+
+- **USE**: `Result<T, E>` for fallible operations, `?` operator
+- **AVOID**: `unwrap()`, `expect()`, panics in library code
+- **PREFER**: `map()`, `and_then()`, `or_else()` on Option/Result
+
+### Performance & Memory
+
+- Minimize allocations and cloning
+- Use references (`&`) when possible
+- Prefer iterators over manual loops
+- Return new data structures over modifying existing ones
+
+## Clippy Configuration
+
+### Required Lints
+
+Enable in `Cargo.toml`:
+
+```toml
+[lints.clippy]
+all = "deny"
+redundant_clone = "deny"
+map_flatten = "deny"
+manual_ok_or = "deny"
+option_if_let_else = "deny"
+redundant_closure = "deny"
+```
+
+### Workflow
+
+- **ALWAYS** run `cargo clippy -- -D warnings` before committing
+- All code must pass Clippy without warnings
+- Use functional iterator methods for all collection operations
+
+## Code Organization
+
+- Keep functions small and focused (single responsibility)
+- Use meaningful names and clear module organization
+- Prefer composition over inheritance
+- Document public APIs with examples
+- Maintain high test coverage with unit and integration tests
+
+## Rust 2024 Edition Standards
+
+- Follow latest Rust idioms and community standards
+- Use modern patterns, avoid deprecated approaches
+- Leverage latest language features appropriately

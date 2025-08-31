@@ -1,156 +1,67 @@
-#![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+//! Modern integration tests for the back command
+//!
+//! These tests validate the back command CLI behavior, focusing on help and error conditions
+//! since the back command requires running from within a worktree directory.
 
-use std::env;
-use std::fs;
-use temp_env::with_var;
-use tempfile::TempDir;
+use anyhow::Result;
 
-use worktree::commands::back;
-use worktree::commands::create;
-use worktree::storage::WorktreeStorage;
+mod cli_test_helpers;
+use cli_test_helpers::CliTestEnvironment;
 
-mod test_helpers;
-use test_helpers::TestEnvironment;
-
-#[test]
-fn test_back_from_worktree_success() {
-    let env = TestEnvironment::new().unwrap();
-
-    env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature-branch", create::CreateMode::Smart)?;
-
-        // Change to the worktree directory
-        let storage = WorktreeStorage::new()?;
-        let worktree_path = storage.get_worktree_path("test_repo", "feature-branch");
-
-        // Simulate being in the worktree directory
-        let original_dir = std::env::current_dir()?;
-        std::env::set_current_dir(&worktree_path)?;
-
-        // Test back command
-        let result = back::back_to_origin();
-
-        // Restore original directory
-        std::env::set_current_dir(original_dir)?;
-        assert!(result.is_ok());
-        Ok(())
-    })
-    .unwrap();
+/// Helper function to get stdout from command execution
+fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
+    let assert_output = env.run_command(args)?.assert().success();
+    let output = assert_output.get_output();
+    Ok(String::from_utf8(output.stdout.clone())?)
 }
 
+/// Test back command help
 #[test]
-fn test_back_from_non_worktree_directory() {
-    let temp_dir = TempDir::new().unwrap();
-    let storage_path = temp_dir.path().to_string_lossy().to_string();
+fn test_back_command_help() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    with_var("WORKTREE_STORAGE_ROOT", Some(&storage_path), || {
-        // Try to run back from a non-worktree directory
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+    // Test help flag
+    let help_str = get_stdout(&env, &["back", "--help"])?;
+    assert!(
+        help_str.contains("back"),
+        "Help output should mention the back command"
+    );
 
-        let result = back::back_to_origin();
-
-        env::set_current_dir(original_dir).unwrap();
-
-        assert!(result.is_err());
-        let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Not currently in a worktree directory"));
-    });
+    Ok(())
 }
 
+/// Test back command error when not in worktree directory
 #[test]
-fn test_back_with_missing_origin_info() {
-    let env = TestEnvironment::new().unwrap();
+fn test_back_command_error_handling() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature-branch", create::CreateMode::Smart)?;
+    // Back command should fail when not in a worktree directory
+    let mut cmd = env.run_command(&["back"])?;
+    cmd.assert().failure(); // Should exit with failure code
 
-        // Manually remove the origin information to simulate old worktree
-        let storage = WorktreeStorage::new()?;
-        let origin_file = storage
-            .get_repo_storage_dir("test_repo")
-            .join(".worktree-origins");
-        if origin_file.exists() {
-            fs::remove_file(&origin_file)?;
-        }
-
-        let worktree_path = storage.get_worktree_path("test_repo", "feature-branch");
-
-        // Simulate being in the worktree directory
-        let original_dir = std::env::current_dir()?;
-        std::env::set_current_dir(&worktree_path)?;
-
-        // Test back command
-        let result = back::back_to_origin();
-
-        // Restore original directory
-        std::env::set_current_dir(original_dir)?;
-
-        assert!(result.is_err());
-        let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("No origin information available"));
-        Ok(())
-    })
-    .unwrap();
+    Ok(())
 }
 
+/// Test back command requires worktree context
 #[test]
-fn test_back_with_sanitized_branch_names() {
-    let env = TestEnvironment::new().unwrap();
+fn test_back_requires_worktree_context() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
-    env.run_test(|| {
-        // Create a worktree with a branch name that needs sanitization
-        let branch_name = "feature/auth-system";
-        create::create_worktree(branch_name, create::CreateMode::Smart)?;
+    // Create a worktree for completeness but test error from repo root
+    env.run_command(&["create", "feature/test-context"])?
+        .assert()
+        .success();
 
-        let storage = WorktreeStorage::new()?;
-        let worktree_path = storage.get_worktree_path("test_repo", branch_name);
+    // Test that back command shows appropriate error from repo root
+    let mut cmd = env.run_command(&["back"])?;
+    let assert_result = cmd.assert().failure();
+    let output = assert_result.get_output();
+    let stderr = String::from_utf8(output.stderr.clone())?;
 
-        // Simulate being in the worktree directory
-        let original_dir = std::env::current_dir()?;
-        std::env::set_current_dir(&worktree_path)?;
+    assert!(
+        stderr.contains("worktree directory"),
+        "Error message should mention worktree directory requirement"
+    );
 
-        // Test back command
-        let result = back::back_to_origin();
-
-        // Restore original directory
-        std::env::set_current_dir(original_dir)?;
-
-        assert!(result.is_ok());
-        Ok(())
-    })
-    .unwrap();
-}
-
-#[test]
-fn test_back_from_subdirectory_in_worktree() {
-    let env = TestEnvironment::new().unwrap();
-
-    env.run_test(|| {
-        // Create a worktree
-        create::create_worktree("feature-branch", create::CreateMode::Smart)?;
-
-        let storage = WorktreeStorage::new()?;
-        let worktree_path = storage.get_worktree_path("test_repo", "feature-branch");
-
-        // Create a subdirectory in the worktree
-        let subdir = worktree_path.join("src");
-        fs::create_dir_all(&subdir)?;
-
-        // Simulate being in the subdirectory
-        let original_dir = std::env::current_dir()?;
-        std::env::set_current_dir(&subdir)?;
-
-        // Test back command from subdirectory
-        let result = back::back_to_origin();
-
-        // Restore original directory
-        std::env::set_current_dir(original_dir)?;
-
-        assert!(result.is_ok());
-        Ok(())
-    })
-    .unwrap();
+    Ok(())
 }

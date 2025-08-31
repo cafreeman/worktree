@@ -33,12 +33,21 @@ enum Commands {
     },
     /// Remove a worktree
     Remove {
-        /// Branch name or path to remove
+        /// Branch name or path to remove. If not provided, opens interactive selection
         #[arg(value_hint = ValueHint::Other)]
-        target: String,
+        target: Option<String>,
         /// Keep the branch (only remove the worktree)
         #[arg(long)]
         keep_branch: bool,
+        /// Launch interactive selection mode
+        #[arg(long)]
+        interactive: bool,
+        /// List available worktrees for completion (internal use)
+        #[arg(long, hide = true)]
+        list_completions: bool,
+        /// Show worktrees for current repo only
+        #[arg(long)]
+        current: bool,
     },
     /// Show worktree status
     Status,
@@ -108,8 +117,17 @@ fn main() -> Result<()> {
         Commands::Remove {
             target,
             keep_branch,
+            interactive,
+            list_completions,
+            current,
         } => {
-            remove::remove_worktree(&target, !keep_branch)?;
+            remove::remove_worktree(
+                target.as_deref(),
+                !keep_branch,
+                interactive,
+                list_completions,
+                current,
+            )?;
         }
         Commands::Status => {
             status::show_status()?;

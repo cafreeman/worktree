@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Enhanced Completion System:**
+
+  - Added intelligent tab completion for `remove` command with worktree name suggestions
+  - Implemented `--list-completions` flag for `remove` command to support shell completion
+  - Enhanced bash, zsh, and fish shell integration with smart worktree name completion
+  - Added interactive mode trigger on empty tab completion for `remove` command
+
+- **Selection Provider Architecture:**
+  - Created `SelectionProvider` trait for abstracting interactive prompts
+  - Implemented `RealSelectionProvider` for production use with `inquire::Select`
+  - Added `MockSelectionProvider` for comprehensive testing of interactive functionality
+  - Enhanced testability of interactive CLI features
+
+### Changed
+
+- **Interactive Command Improvements:**
+
+  - Refactored `jump` and `remove` commands to support provider-based selection
+  - Enhanced `remove` command with interactive selection when no target specified
+  - Improved completion handling with current repository filtering options
+  - Added support for `--current` flag in remove completions
+
+- **Testing Infrastructure Modernization:**
+  - Migrated all tests to modern patterns using `assert_fs`, `assert_cmd`, and `rexpect`
+  - Replaced manual temporary directory management with declarative filesystem testing
+  - Implemented comprehensive interactive CLI testing with `rexpect` for user prompts
+  - Added 89 modern tests across 10 test modules with full command coverage
+  - Removed legacy testing infrastructure and eliminated test duplication
+  - Established modern testing patterns for all future CLI development
+
 ## [0.2.0] - 2025-08-29
 
 ### Added

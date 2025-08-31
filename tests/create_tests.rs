@@ -1,184 +1,142 @@
 #![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
 
+//! Modern integration tests for the create command
+//!
+//! These tests use assert_fs for declarative filesystem setup and validation,
+//! testing the create command with real CLI execution and comprehensive
+//! error handling scenarios.
+
 use anyhow::Result;
-use std::path::{Path, PathBuf};
-use worktree::commands::create::{self, CreateMode};
+use assert_fs::prelude::*;
+use predicates::prelude::*;
 
-mod test_helpers;
-use test_helpers::TestEnvironment;
+mod cli_test_helpers;
+use cli_test_helpers::{CliTestEnvironment, patterns};
 
-/// Mock GitOperations for testing config inheritance
-#[derive(Clone)]
-struct MockGitRepo {
-    repo_path: PathBuf,
-    inherit_config_called: std::sync::Arc<std::sync::Mutex<bool>>,
-}
-
-impl MockGitRepo {
-    fn new(repo_path: PathBuf) -> Self {
-        Self {
-            repo_path,
-            inherit_config_called: std::sync::Arc::new(std::sync::Mutex::new(false)),
-        }
-    }
-
-    fn was_inherit_config_called(&self) -> bool {
-        *self.inherit_config_called.lock().unwrap()
-    }
-}
-
-impl worktree::traits::GitOperations for MockGitRepo {
-    fn open(_path: &Path) -> Result<Box<dyn worktree::traits::GitOperations>>
-    where
-        Self: Sized,
-    {
-        unreachable!("Use new() for testing")
-    }
-
-    fn get_repo_path(&self) -> PathBuf {
-        self.repo_path.clone()
-    }
-
-    fn branch_exists(&self, _branch_name: &str) -> Result<bool> {
-        // Return false so that smart mode will create the branch
-        Ok(false)
-    }
-
-    fn create_worktree(
-        &self,
-        _branch_name: &str,
-        worktree_path: &Path,
-        _create_branch: bool,
-    ) -> Result<()> {
-        std::fs::create_dir_all(worktree_path)?;
-
-        // Create a minimal git worktree structure
-        let git_dir = worktree_path.join(".git");
-        std::fs::write(
-            &git_dir,
-            format!("gitdir: {}", self.repo_path.join(".git").display()),
-        )?;
-
-        Ok(())
-    }
-
-    fn remove_worktree(&self, _worktree_name: &str) -> Result<()> {
-        Ok(())
-    }
-
-    fn list_worktrees(&self) -> Result<Vec<String>> {
-        Ok(vec![])
-    }
-
-    fn delete_branch(&self, _branch_name: &str) -> Result<()> {
-        Ok(())
-    }
-
-    fn inherit_config(&self, _worktree_path: &Path) -> Result<()> {
-        *self.inherit_config_called.lock().unwrap() = true;
-        Ok(())
-    }
-}
-
+/// Test create command with config file copying using declarative filesystem assertions
 #[test]
-fn test_create_worktree_simple() -> Result<()> {
-    let env = TestEnvironment::new()?;
+fn test_create_worktree_with_config_files() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Declarative filesystem setup
+    patterns::create_worktree_config(
+        &env.repo_dir,
+        &[".env*", ".vscode/", "*.local.json"],
+        &["node_modules/"],
+    )?;
+    patterns::create_sample_config_files(&env.repo_dir)?;
+
+    // Execute command with assert_cmd
+    env.run_command(&["create", "feature/config-test"])?
+        .assert()
+        .success();
+
+    // Declarative assertions using predicates
+    let worktree_path = env.worktree_path("feature/config-test");
+    worktree_path.assert(predicate::path::is_dir());
+
+    // Verify config files were copied
+    patterns::assert_config_files_copied(&worktree_path)?;
+
+    // Verify git worktree structure
+    worktree_path
+        .child(".git")
+        .assert(predicate::path::exists());
+
+    // Check branch mapping file
+    let mapping_file = env.storage_dir.child("test_repo").child(".branch-mapping");
+    mapping_file.assert(predicate::str::contains(
+        "feature-config-test -> feature/config-test",
+    ));
+
+    Ok(())
+}
+
+/// Test error handling when target directory already exists
+#[test]
+fn test_create_worktree_directory_already_exists() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Pre-create the target directory
+    let worktree_path = env.worktree_path("feature/existing");
+    worktree_path.create_dir_all()?;
+
+    // Attempt to create worktree - should fail
+    env.run_command(&["create", "feature/existing"])?
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+
+    Ok(())
+}
+
+/// Test different branch creation modes (smart, new-branch, existing-branch)
+#[test]
+fn test_create_worktree_modes() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Test smart mode (default) - should create new branch automatically
+    env.run_command(&["create", "feature/smart-mode"])?
+        .assert()
+        .success();
+
+    env.worktree_path("feature/smart-mode")
+        .assert(predicate::path::is_dir());
+
+    // Test explicit new branch mode
+    env.run_command(&["create", "--new-branch", "feature/explicit-new"])?
+        .assert()
+        .success();
+
+    env.worktree_path("feature/explicit-new")
+        .assert(predicate::path::is_dir());
+
+    // Test existing branch mode - create a branch first, then use it
+    env.run_test(|| {
+        // Create a branch but don't check it out
+        std::process::Command::new("git")
+            .args(["branch", "feature/existing-test"])
+            .current_dir(&env.repo_dir)
+            .output()?;
+        Ok(())
+    })?;
+
+    env.run_command(&["create", "--existing-branch", "feature/existing-test"])?
+        .assert()
+        .success();
+
+    env.worktree_path("feature/existing-test")
+        .assert(predicate::path::is_dir());
+
+    Ok(())
+}
+
+/// Test git configuration inheritance in created worktrees
+#[test]
+fn test_git_config_inheritance() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
 
     env.run_test(|| {
-        // Create a worktree (smart mode will create the branch since it doesn't exist)
-        create::create_worktree("feature/test", CreateMode::Smart)?;
-
-        // Verify real files were created
-        let worktree_path = env.storage_root.join("test_repo").join("feature-test");
-        assert!(worktree_path.exists());
-
-        // Verify branch mapping file
-        let mapping_file = env.storage_root.join("test_repo").join(".branch-mapping");
-        assert!(mapping_file.exists());
-
-        let mapping_content = std::fs::read_to_string(mapping_file)?;
-        assert!(mapping_content.contains("feature-test -> feature/test"));
-
-        Ok(())
-    })
-}
-
-#[test]
-fn test_create_worktree_path_exists() -> Result<()> {
-    let env = TestEnvironment::new()?;
-
-    env.run_test(|| {
-        // Pre-create the worktree directory
-        let worktree_path = env.storage_root.join("test_repo").join("feature-test");
-        std::fs::create_dir_all(&worktree_path)?;
-
-        let result = create::create_worktree("feature/test", CreateMode::Smart);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("already exists"));
-
-        Ok(())
-    })
-}
-
-#[test]
-fn test_config_inheritance_is_called() -> Result<()> {
-    let env = TestEnvironment::new()?;
-
-    env.run_test(|| {
-        let mock_git = MockGitRepo::new(env.repo_path.clone());
-
-        // Test that config inheritance is called during worktree creation
-        create::create_worktree_with_git(&mock_git, "feature/test", CreateMode::Smart)?;
-
-        // Verify that inherit_config was called
-        assert!(
-            mock_git.was_inherit_config_called(),
-            "inherit_config should have been called"
-        );
-
-        Ok(())
-    })
-}
-
-#[test]
-fn test_config_inheritance_with_real_git() -> Result<()> {
-    let env = TestEnvironment::new()?;
-
-    env.run_test(|| {
-        // Set some additional git config in the test repo
+        // Set some custom git config in the test repo
         std::process::Command::new("git")
             .args(["config", "core.editor", "nano"])
-            .current_dir(&env.repo_path)
+            .current_dir(&env.repo_dir)
             .output()?;
 
         std::process::Command::new("git")
-            .args(["config", "user.signingkey", "test-key"])
-            .current_dir(&env.repo_path)
+            .args(["config", "user.signingkey", "test-key-123"])
+            .current_dir(&env.repo_dir)
             .output()?;
 
-        // Create a worktree (this will use real GitRepo and config inheritance)
-        create::create_worktree("feature/config-test", CreateMode::Smart)?;
+        // Create worktree
+        env.run_command(&["create", "feature/config-inherit"])?
+            .assert()
+            .success();
 
-        let worktree_path = env
-            .storage_root
-            .join("test_repo")
-            .join("feature-config-test");
-        assert!(worktree_path.exists(), "Worktree should be created");
+        let worktree_path = env.worktree_path("feature/config-inherit");
+        worktree_path.assert(predicate::path::exists());
 
-        // Check that extensions.worktreeConfig is enabled in the main repo
-        let output = std::process::Command::new("git")
-            .args(["config", "extensions.worktreeConfig"])
-            .current_dir(&env.repo_path)
-            .output()?;
-
-        let config_value = String::from_utf8(output.stdout)?;
-        assert_eq!(
-            config_value.trim(),
-            "true",
-            "worktreeConfig extension should be enabled"
-        );
-
-        // Verify worktree has inherited config by checking the worktree-specific config
+        // Verify config inheritance by checking worktree-specific config
         let output = std::process::Command::new("git")
             .args(["config", "--worktree", "--get", "user.name"])
             .current_dir(&worktree_path)
@@ -186,13 +144,118 @@ fn test_config_inheritance_with_real_git() -> Result<()> {
 
         if output.status.success() {
             let user_name = String::from_utf8(output.stdout)?;
-            assert_eq!(
-                user_name.trim(),
-                "Test User",
-                "user.name should be inherited"
-            );
+            assert_eq!(user_name.trim(), "Test User");
         }
+
+        // Check that extensions.worktreeConfig is enabled
+        let output = std::process::Command::new("git")
+            .args(["config", "extensions.worktreeConfig"])
+            .current_dir(&env.repo_dir)
+            .output()?;
+
+        let config_value = String::from_utf8(output.stdout)?;
+        assert_eq!(config_value.trim(), "true");
 
         Ok(())
     })
+}
+
+/// Test branch name sanitization for filesystem storage
+#[test]
+fn test_branch_name_sanitization() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Test various branch names that need sanitization
+    let test_cases = vec![
+        ("feature/user-auth", "feature-user-auth"),
+        ("bugfix/critical-issue", "bugfix-critical-issue"),
+        ("release/v1.0.0", "release-v1.0.0"),
+    ];
+
+    for (original_branch, expected_dir) in test_cases {
+        env.run_command(&["create", "--new-branch", original_branch])?
+            .assert()
+            .success();
+
+        // Check that directory uses sanitized name
+        let worktree_path = env.storage_dir.child("test_repo").child(expected_dir);
+        worktree_path.assert(predicate::path::is_dir());
+
+        // Check that mapping preserves original name
+        let mapping_file = env.storage_dir.child("test_repo").child(".branch-mapping");
+        mapping_file.assert(predicate::str::contains(&format!(
+            "{} -> {}",
+            expected_dir, original_branch
+        )));
+    }
+
+    Ok(())
+}
+
+// TODO: Add interactive tests once we implement interactive features in create command
+// These would test scenarios like:
+// - Interactive branch name input
+// - Confirmation prompts for branch creation
+// - Interactive selection of base branch
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    /// Test that the CLI helper framework itself works correctly
+    #[test]
+    fn test_cli_test_environment_setup() -> Result<()> {
+        let env = CliTestEnvironment::new()?;
+
+        // Verify git repository setup
+        env.repo_dir.assert(predicate::path::is_dir());
+        env.repo_dir.child(".git").assert(predicate::path::exists());
+        env.repo_dir
+            .child("README.md")
+            .assert(predicate::str::contains("# Test Repo"));
+
+        // Verify storage directory
+        env.storage_dir.assert(predicate::path::is_dir());
+
+        // Test command execution setup
+        let cmd_result = env.run_command(&["--help"]);
+        assert!(cmd_result.is_ok(), "Should be able to create command");
+
+        Ok(())
+    }
+
+    /// Test pattern helper functions
+    #[test]
+    fn test_pattern_helpers() -> Result<()> {
+        let env = CliTestEnvironment::new()?;
+
+        // Test config creation helper
+        patterns::create_worktree_config(
+            &env.repo_dir,
+            &[".env*", ".vscode/"],
+            &["node_modules/", "target/"],
+        )?;
+
+        env.repo_dir
+            .child(".worktree-config.toml")
+            .assert(predicate::str::contains("copy-patterns"))
+            .assert(predicate::str::contains(".env*"))
+            .assert(predicate::str::contains("node_modules/"));
+
+        // Test sample file creation
+        patterns::create_sample_config_files(&env.repo_dir)?;
+
+        env.repo_dir
+            .child(".env")
+            .assert(predicate::str::contains("TEST_VAR"));
+        env.repo_dir
+            .child(".vscode")
+            .child("settings.json")
+            .assert(predicate::path::exists());
+        env.repo_dir
+            .child("config.local.json")
+            .assert(predicate::str::contains("debug"));
+
+        Ok(())
+    }
 }
