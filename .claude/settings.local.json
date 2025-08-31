@@ -12,7 +12,10 @@
       "Read(/Users/chris.freeman/.worktrees/**)",
       "Read(/Users/chris.freeman/.worktrees/worktree/**)",
       "mcp__codanna__find_symbol",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "WebSearch",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)"
     ],
     "deny": [],
     "ask": []
