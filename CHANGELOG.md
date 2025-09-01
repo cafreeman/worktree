@@ -17,10 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added interactive mode trigger on empty tab completion for `remove` command
 
 - **Selection Provider Architecture:**
+
   - Created `SelectionProvider` trait for abstracting interactive prompts
   - Implemented `RealSelectionProvider` for production use with `inquire::Select`
   - Added `MockSelectionProvider` for comprehensive testing of interactive functionality
   - Enhanced testability of interactive CLI features
+
+- **Enhanced Configuration System:**
+  - Improved configuration structures with optional fields and better error handling
+  - Added comprehensive configuration loading and merging behavior validation
+  - Enhanced documentation for flexible configuration system with precedence rules
 
 ### Changed
 
@@ -32,12 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added support for `--current` flag in remove completions
 
 - **Testing Infrastructure Modernization:**
+
   - Migrated all tests to modern patterns using `assert_fs`, `assert_cmd`, and `rexpect`
   - Replaced manual temporary directory management with declarative filesystem testing
   - Implemented comprehensive interactive CLI testing with `rexpect` for user prompts
   - Added 89 modern tests across 10 test modules with full command coverage
   - Removed legacy testing infrastructure and eliminated test duplication
   - Established modern testing patterns for all future CLI development
+  - Split test helpers into focused modules with dedicated test-support crate
+  - Eliminated all dead code warnings across test suite
+
+- **Rust 2024 Edition Migration:**
+  - Updated project to use Rust 2024 edition for latest language features and improvements
+
+### Fixed
+
+- **Critical Bug Fix in Remove Command:**
+  - Fixed dangerous fallback behavior in `remove` command that could incorrectly use sanitized branch names instead of canonical branch names
+  - Resolved issue where missing or corrupted branch mapping files caused git operations to fail silently
+  - Enhanced branch name resolution logic to safely distinguish canonical vs sanitized names
+  - Added git repository verification before assuming branch names are canonical
+  - Improved error handling to provide clear guidance when branch mappings are corrupted
 
 ## [0.2.0] - 2025-08-29
 
