@@ -180,7 +180,7 @@ fn test_branch_name_sanitization() -> Result<()> {
 
         // Check that mapping preserves original name
         let mapping_file = env.storage_dir.child("test_repo").child(".branch-mapping");
-        mapping_file.assert(predicate::str::contains(&format!(
+        mapping_file.assert(predicate::str::contains(format!(
             "{} -> {}",
             expected_dir, original_branch
         )));

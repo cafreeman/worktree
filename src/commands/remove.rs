@@ -143,7 +143,8 @@ fn resolve_target(
 
     // Helper function to check if target contains characters that would be sanitized
     let contains_special_chars = |s: &str| {
-        s.chars().any(|c| matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        s.chars()
+            .any(|c| matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
     };
 
     // If target contains special characters, it's likely a canonical branch name
@@ -164,7 +165,7 @@ fn resolve_target(
             // Target is sanitized, return the original branch name
             return Ok((worktree_path, original_branch));
         }
-        
+
         // No mapping found - check if the branch actually exists in git
         // If git has a branch with this exact name, then target is canonical
         let current_dir = std::env::current_dir()?;
@@ -176,7 +177,7 @@ fn resolve_target(
                 }
             }
         }
-        
+
         // Git doesn't have a branch with this name, so target is likely sanitized
         // but we can't resolve it without the mapping - error out for safety
         anyhow::bail!(

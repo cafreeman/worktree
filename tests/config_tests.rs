@@ -19,7 +19,7 @@ fn test_no_config_file_uses_defaults() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Load config from repo with no config file
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should have default include patterns
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -52,7 +52,7 @@ exclude = ["*.secret", "temp/"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should have user patterns + defaults (precedence-based merging)
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -85,7 +85,7 @@ fn test_blank_config_file_uses_defaults() -> Result<()> {
     // Create completely empty config file
     env.repo_dir.child(".worktree-config.toml").write_str("")?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should use default patterns when file is empty
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -116,7 +116,7 @@ include = ["mise.toml", "docker-compose.yml"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should merge: user includes + default includes (additive merging)
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -151,7 +151,7 @@ exclude = ["*.secret", "private/"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should merge: default includes + user excludes + default excludes
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -187,7 +187,7 @@ exclude = [".vscode/"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     let includes = config.copy_patterns.include.as_ref().unwrap();
     // Should have all default includes
@@ -224,7 +224,7 @@ value = 123
     )?;
 
     // Should parse successfully despite unknown keys
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     let includes = config.copy_patterns.include.as_ref().unwrap();
     assert!(includes.contains(&"mise.toml".to_string()));
@@ -249,7 +249,7 @@ invalid syntax here
     )?;
 
     // Should not fail, but use defaults with warning
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should fall back to defaults
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -277,7 +277,7 @@ key = "value"
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should use defaults when section is missing
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -402,7 +402,7 @@ exclude = []
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should have defaults (precedence-based merging always adds defaults)
     let includes = config.copy_patterns.include.as_ref().unwrap();
@@ -428,7 +428,7 @@ include = ["mise.toml", "mise.toml", "docker-compose.yml"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     let includes = config.copy_patterns.include.as_ref().unwrap();
     assert!(includes.contains(&"mise.toml".to_string()));
@@ -453,7 +453,7 @@ include = ["node_modules/.cache"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     let includes = config.copy_patterns.include.as_ref().unwrap();
     // Should have user include + defaults
@@ -482,7 +482,7 @@ exclude = ["*.secret"]
 "#,
     )?;
 
-    let config = WorktreeConfig::load_from_repo(&env.repo_dir.to_path_buf())?;
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
     // Should have user patterns + defaults (precedence-based merging)
     let includes = config.copy_patterns.include.as_ref().unwrap();

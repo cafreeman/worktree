@@ -51,7 +51,7 @@ pub struct WorktreeConfig {
 ///
 /// All fields are optional to support partial configurations that merge with defaults.
 /// This enables users to specify only what they want to customize.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct CopyPatterns {
     /// Patterns to include in file copying (glob patterns)
     ///
@@ -66,15 +66,6 @@ pub struct CopyPatterns {
     /// If not specified, only default exclude patterns are used.
     #[serde(default)]
     pub exclude: Option<Vec<String>>,
-}
-
-impl Default for CopyPatterns {
-    fn default() -> Self {
-        Self {
-            include: None,
-            exclude: None,
-        }
-    }
 }
 
 impl Default for WorktreeConfig {
@@ -191,6 +182,7 @@ impl WorktreeConfig {
     /// exclude = [".vscode/"]
     /// # Result: default excludes + .vscode/ (even though .vscode/ is included by default)
     /// ```
+    #[must_use]
     pub fn merged_with_defaults(self) -> Self {
         let mut merged_includes = Self::default_include_patterns();
         let mut merged_excludes = Self::default_exclude_patterns();

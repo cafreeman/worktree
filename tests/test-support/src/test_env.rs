@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
 
 use anyhow::{Context, Result};
-use assert_fs::TempDir;
 use assert_fs::prelude::*;
+use assert_fs::TempDir;
 
 use std::process::Command;
 
@@ -115,11 +115,10 @@ mod tests {
 
         // Test branch name sanitization
         let path = env.worktree_path("feature/test-branch");
-        assert!(
-            path.path()
-                .to_string_lossy()
-                .contains("feature-test-branch")
-        );
+        assert!(path
+            .path()
+            .to_string_lossy()
+            .contains("feature-test-branch"));
 
         Ok(())
     }

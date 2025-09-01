@@ -89,8 +89,7 @@ mod tests {
         let provider = MockSelectionProvider::new("option1");
 
         let result = provider.select("Test prompt", options);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "option1");
+        assert!(matches!(result, Ok(ref s) if s == "option1"));
     }
 
     #[test]
@@ -106,16 +105,14 @@ mod tests {
     fn test_extract_path_from_selection() {
         let selection = "repo/branch (/some/path)";
         let result = extract_path_from_selection(selection);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("/some/path"));
+        assert!(matches!(result, Ok(ref p) if p == &PathBuf::from("/some/path")));
     }
 
     #[test]
     fn test_extract_branch_from_selection() {
         let selection = "repo/feature-branch (/some/path)";
         let result = extract_branch_from_selection(selection);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "feature-branch");
+        assert!(matches!(result, Ok(ref b) if b == "feature-branch"));
     }
 
     #[test]
