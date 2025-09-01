@@ -1,6 +1,5 @@
 ---
-description: Expert guide for using Codanna MCP tools for semantic code analysis and navigation
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Codanna Navigator - MCP Tools Specialist

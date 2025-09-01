@@ -192,12 +192,6 @@ fn test_branch_name_sanitization() -> Result<()> {
     Ok(())
 }
 
-// TODO: Add interactive tests once we implement interactive features in create command
-// These would test scenarios like:
-// - Interactive branch name input
-// - Confirmation prompts for branch creation
-// - Interactive selection of base branch
-
 #[cfg(test)]
 mod integration_tests {
     use super::*;
