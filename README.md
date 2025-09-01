@@ -1,30 +1,20 @@
-# Worktree CLI
+# Worktree
 
 A powerful CLI tool that transforms git worktree management from painful to effortless. Stop juggling multiple local repos, losing config files, or manually organizing worktree directories.
-
 **The Problem:** Git worktrees are incredibly useful for parallel development, but the native git commands are cumbersome. You end up with worktrees scattered across your filesystem, config files that don't transfer, and no easy way to navigate between them.
 
 **The Solution:** Worktree CLI provides a centralized, intelligent system that handles all the complexity for you. Create, manage, and navigate worktrees with simple commands while automatically maintaining your development environment.
 
 ## Why Use Worktree CLI?
 
-- ⚡ **Zero Setup Friction** - Create worktrees anywhere in your project with one command
-- 🏠 **Centralized & Organized** - All worktrees live in `~/.worktrees/<repo>/<branch>/` - no more scattered directories
-- 🔄 **Config Sync Magic** - Your `.env`, `.vscode/`, and local config files automatically follow you to new worktrees
-- 🧭 **Effortless Navigation** - Jump between worktrees instantly with smart completions and interactive selection
-- 🔙 **Quick Return** - Navigate back to original repo from any worktree with `worktree back`
-- 🧹 **Self-Cleaning** - Automatically cleans up orphaned branches and references to prevent git clutter
-- 🔧 **Developer-Friendly** - Shell integration with intelligent tab completions and directory changing
-- 🛡️ **Handles Edge Cases** - Safe branch name sanitization, git config inheritance, and sync state management
+- **Centralized storage**: All worktrees live in `~/.worktrees/<repo>/<branch>/`
+- **Shell integration**: `worktree` changes directories and provides completions
+- **Smart automation**: Config copy, cleanup, and safe branch name handling
 
 ## Installation
 
-> **⚠️ Important:** This tool requires shell integration to function properly. The `worktree jump` and `worktree back` commands won't work without it, and you'll miss out on intelligent tab completions. Make sure to complete both installation steps below.
-
-### 1. Install from crates.io
-
 ```bash
-# Install the latest version from crates.io
+# Install
 cargo install worktree
 ```
 
@@ -587,6 +577,10 @@ alias wtc='worktree create'
 alias wtl='worktree list --current'
 alias wts='worktree status'
 ```
+
+## Testing
+
+For testing workflows and test helper utilities, see [TESTING.md](TESTING.md).
 
 ## Contributing
 

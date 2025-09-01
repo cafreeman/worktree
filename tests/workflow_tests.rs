@@ -10,8 +10,10 @@ use anyhow::Result;
 use assert_fs::prelude::*;
 use predicates::prelude::*;
 
-mod cli_test_helpers;
-use cli_test_helpers::{CliTestEnvironment, patterns};
+use test_support::{
+    CliTestEnvironment, assert_config_files_copied, create_sample_config_files,
+    create_worktree_config,
+};
 
 /// Helper function to get stdout from command execution
 fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
@@ -26,12 +28,12 @@ fn test_complete_development_workflow() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Setup: Create project configuration
-    patterns::create_worktree_config(
+    create_worktree_config(
         &env.repo_dir,
         &[".env*", ".vscode/", "*.local.json"],
         &["node_modules/", "target/"],
     )?;
-    patterns::create_sample_config_files(&env.repo_dir)?;
+    create_sample_config_files(&env.repo_dir)?;
 
     // Step 1: Create main feature worktree
     env.run_command(&["create", "feature/payment-system"])?
@@ -42,7 +44,7 @@ fn test_complete_development_workflow() -> Result<()> {
     main_worktree.assert(predicate::path::is_dir());
 
     // Verify config files were copied during creation
-    patterns::assert_config_files_copied(&main_worktree)?;
+    assert_config_files_copied(&main_worktree)?;
 
     // Step 2: Jump to the worktree (simulate developer workflow)
     let jump_output = get_stdout(&env, &["jump", "feature/payment-system"])?;
@@ -186,14 +188,14 @@ fn test_config_inheritance_workflow() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Step 1: Setup base configuration
-    patterns::create_worktree_config(
+    create_worktree_config(
         &env.repo_dir,
         &[".env*", ".vscode/", "*.local.json", "docker-*"],
         &["*.log", "node_modules/"],
     )?;
 
     // Create comprehensive config setup
-    patterns::create_sample_config_files(&env.repo_dir)?;
+    create_sample_config_files(&env.repo_dir)?;
     env.repo_dir
         .child("docker-compose.dev.yml")
         .write_str("version: '3'")?;
@@ -204,7 +206,7 @@ fn test_config_inheritance_workflow() -> Result<()> {
         .success();
 
     let base_path = env.worktree_path("feature/base-config");
-    patterns::assert_config_files_copied(&base_path)?;
+    assert_config_files_copied(&base_path)?;
     base_path
         .child("docker-compose.dev.yml")
         .assert(predicate::str::contains("version"));

@@ -9,8 +9,7 @@ use anyhow::Result;
 use assert_fs::prelude::*;
 use predicates::prelude::*;
 
-mod cli_test_helpers;
-use cli_test_helpers::CliTestEnvironment;
+use test_support::CliTestEnvironment;
 
 /// Test interactive removal with mock selection provider
 #[test]

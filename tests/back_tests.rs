@@ -5,8 +5,7 @@
 
 use anyhow::Result;
 
-mod cli_test_helpers;
-use cli_test_helpers::CliTestEnvironment;
+use test_support::CliTestEnvironment;
 
 /// Helper function to get stdout from command execution
 fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {

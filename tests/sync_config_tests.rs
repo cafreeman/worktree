@@ -9,8 +9,10 @@ use anyhow::Result;
 use assert_fs::prelude::*;
 use predicates::prelude::*;
 
-mod cli_test_helpers;
-use cli_test_helpers::{CliTestEnvironment, patterns};
+use test_support::{
+    CliTestEnvironment, assert_config_files_copied, create_sample_config_files,
+    create_worktree_config,
+};
 
 /// Test basic configuration file synchronization between worktrees
 #[test]
@@ -33,7 +35,7 @@ fn test_sync_config_between_worktrees() -> Result<()> {
     target_path.assert(predicate::path::is_dir());
 
     // Create config files in source using our helper
-    patterns::create_sample_config_files(&source_path)?;
+    create_sample_config_files(&source_path)?;
 
     // Test sync-config command
     env.run_command(&["sync-config", "feature/source", "feature/target"])?
@@ -61,7 +63,7 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create custom worktree config
-    patterns::create_worktree_config(
+    create_worktree_config(
         &env.repo_dir,
         &[".env*", ".vscode/", "*.local.*", "custom-config.yml"],
         &["node_modules/", "target/"],
@@ -187,7 +189,7 @@ fn test_sync_config_with_sanitized_names() -> Result<()> {
     let target_path = env.worktree_path("feature/sync-target");
 
     // Create config files
-    patterns::create_sample_config_files(&source_path)?;
+    create_sample_config_files(&source_path)?;
 
     // Test sync using original branch names (with special chars)
     env.run_command(&["sync-config", "feature/sync-source", "feature/sync-target"])?
@@ -195,7 +197,7 @@ fn test_sync_config_with_sanitized_names() -> Result<()> {
         .success();
 
     // Verify sync worked
-    patterns::assert_config_files_copied(&target_path)?;
+    assert_config_files_copied(&target_path)?;
 
     Ok(())
 }
@@ -244,7 +246,7 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create config with specific exclude patterns
-    patterns::create_worktree_config(
+    create_worktree_config(
         &env.repo_dir,
         &[".env*", ".vscode/", "*.local.*"],
         &["*.log", "*.tmp", "node_modules/", "secret.*"],

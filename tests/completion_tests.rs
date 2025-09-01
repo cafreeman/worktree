@@ -6,8 +6,7 @@
 use anyhow::Result;
 use assert_fs::prelude::*;
 
-mod cli_test_helpers;
-use cli_test_helpers::{CliTestEnvironment, patterns};
+use test_support::{CliTestEnvironment, create_worktree_config};
 
 /// Helper function to get stdout from command execution
 fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
@@ -291,7 +290,7 @@ fn test_completion_with_config_setup() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Setup config patterns
-    patterns::create_worktree_config(
+    create_worktree_config(
         &env.repo_dir,
         &[".env*", ".vscode/", "*.local.json"],
         &["node_modules/", "*.log"],

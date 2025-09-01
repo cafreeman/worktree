@@ -9,8 +9,7 @@ use assert_fs::prelude::*;
 use std::sync::{Arc, Barrier};
 use std::thread;
 
-mod cli_test_helpers;
-use cli_test_helpers::{CliTestEnvironment, patterns};
+use test_support::{CliTestEnvironment, create_worktree_config};
 
 /// Helper function to get stdout from command execution
 fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
@@ -194,9 +193,9 @@ fn test_config_isolation() -> Result<()> {
     let env2 = CliTestEnvironment::new()?;
 
     // Create different config setups in each environment
-    patterns::create_worktree_config(&env1.repo_dir, &[".env*", "*.config"], &["*.log"])?;
+    create_worktree_config(&env1.repo_dir, &[".env*", "*.config"], &["*.log"])?;
 
-    patterns::create_worktree_config(&env2.repo_dir, &[".vscode/", "*.json"], &["node_modules/"])?;
+    create_worktree_config(&env2.repo_dir, &[".vscode/", "*.json"], &["node_modules/"])?;
 
     // Create worktrees in each environment
     env1.run_command(&["create", "feature/config1"])?

@@ -47,6 +47,7 @@ rexpect = "0.5"
 assert_fs = "1.1"
 predicates = "3.1"
 assert_cmd = "2.0"
+test-support = { path = "tests/test-support" }
 
 [lints.clippy]
 # Deny common footguns that can cause runtime panics
