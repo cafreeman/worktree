@@ -154,7 +154,9 @@ Branch names with special characters are automatically sanitized for filesystem 
 
 ## Configuration
 
-Create a `.worktree-config.toml` in your repository root to customize which files are copied to new worktrees:
+Create a `.worktree-config.toml` in your repository root to customize which files are copied to new worktrees. The configuration system is flexible and supports partial configurations that merge with sensible defaults.
+
+### Basic Configuration
 
 ```toml
 [copy-patterns]
@@ -177,10 +179,52 @@ exclude = [
 ]
 ```
 
-**Default patterns (if no config file exists):**
+### Flexible Configuration Options
+
+You can specify only the patterns you want to customize. Your configuration merges with defaults using precedence rules:
+
+```toml
+# Add custom includes (merges with defaults)
+[copy-patterns]
+include = ["mise.toml", "docker-compose.yml"]
+# Result: Default includes + custom includes + default excludes
+```
+
+```toml
+# Add custom excludes (merges with defaults)
+[copy-patterns]
+exclude = ["*.secret", "private/"]
+# Result: Default includes + default excludes + custom excludes
+```
+
+### Precedence Rules
+
+Your configuration wins when there are conflicts:
+
+```toml
+# Include something normally excluded by default
+[copy-patterns]
+include = ["node_modules/.cache"]
+# Result: Default includes + node_modules/.cache + default excludes
+# (node_modules/.cache gets included despite node_modules/ being excluded)
+```
+
+```toml
+# Exclude something normally included by default
+[copy-patterns]
+exclude = [".vscode/"]
+# Result: Default includes + default excludes + .vscode/
+# (.vscode/ gets excluded despite being included by default)
+```
+
+This approach is simple and intuitive - your choices always override the defaults when there's a conflict.
+
+### Default Patterns
+
+If no config file exists, these patterns are used:
 
 - **Included**: `.env*`, `.vscode/`, `*.local.json`, `config/local/*`
-- **Excluded**: `node_modules/`, `target/`, `.git/`, common temporary files
+- **Excluded**: `node_modules/`, `target/`, `.git/`, `*.log`, `*.tmp`
 
 ## Advanced Features
 

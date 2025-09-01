@@ -156,10 +156,13 @@ pub fn copy_config_files(
 ) -> Result<()> {
     println!("Copying configuration files...");
 
-    for pattern in &config.copy_patterns.include {
+    for pattern in config.copy_patterns.include.as_ref().unwrap_or(&vec![]) {
         if let Some(matches) = find_matching_files(source_path, pattern)? {
             for source_file in matches {
-                if should_exclude_file(&source_file, &config.copy_patterns.exclude)? {
+                if should_exclude_file(
+                    &source_file,
+                    config.copy_patterns.exclude.as_ref().unwrap_or(&vec![]),
+                )? {
                     continue;
                 }
 
