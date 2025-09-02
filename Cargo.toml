@@ -1,6 +1,6 @@
 [package]
 name = "worktree"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A powerful CLI tool for managing git worktrees with enhanced features including centralized storage, automatic config file synchronization, and intelligent branch management"
 license = "MIT"
