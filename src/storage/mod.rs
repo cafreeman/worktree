@@ -178,7 +178,10 @@ impl WorktreeStorage {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 if let Some(name) = entry.file_name().to_str() {
-                    worktrees.push(name.to_string());
+                    // Skip the .managed-branches directory as it's not a worktree
+                    if name != ".managed-branches" {
+                        worktrees.push(name.to_string());
+                    }
                 }
             }
         }
@@ -250,16 +253,12 @@ impl WorktreeStorage {
     }
 
     /// Unmarks a branch as managed by this CLI
-    ///
-    /// # Errors
-    /// Returns an error if file deletion fails unexpectedly
-    pub fn unmark_branch_managed(&self, repo_name: &str, branch_name: &str) -> Result<()> {
+    pub fn unmark_branch_managed(&self, repo_name: &str, branch_name: &str) {
         let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
         if flag_path.exists() {
             // Ignore error if already removed by concurrent cleanup
             let _ = std::fs::remove_file(&flag_path);
         }
-        Ok(())
     }
 
     /// Stores origin information for a worktree

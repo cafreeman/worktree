@@ -12,7 +12,9 @@ fn test_cleanup_deletes_only_managed_orphan_branches() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a managed branch via CLI
-    env.run_command(&["create", "feature/managed-a"])?.assert().success();
+    env.run_command(&["create", "feature/managed-a"])?
+        .assert()
+        .success();
 
     // Create an independent branch NOT via CLI (unmanaged)
     // Create branch and do not create a worktree
@@ -34,7 +36,7 @@ fn test_cleanup_deletes_only_managed_orphan_branches() -> Result<()> {
     // Simulate orphaning: remove the managed worktree directory
     let managed_path = env.worktree_path("feature/managed-a");
     managed_path.assert(predicate::path::is_dir());
-    managed_path.remove_dir_all()?;
+    std::fs::remove_dir_all(&managed_path)?;
 
     // Run cleanup
     env.run_command(&["cleanup"])?.assert().success();
@@ -42,7 +44,7 @@ fn test_cleanup_deletes_only_managed_orphan_branches() -> Result<()> {
     // Managed branch should be deleted
     // Verify by trying to checkout it fails
     let checkout = std::process::Command::new("git")
-        .args(["checkout", "feature/managed-a"]) 
+        .args(["checkout", "feature/managed-a"])
         .current_dir(env.repo_dir.path())
         .output()
         .unwrap();
@@ -50,7 +52,7 @@ fn test_cleanup_deletes_only_managed_orphan_branches() -> Result<()> {
 
     // Unmanaged branch should still exist
     let checkout_unmanaged = std::process::Command::new("git")
-        .args(["checkout", "feature/unmanaged-b"]) 
+        .args(["checkout", "feature/unmanaged-b"])
         .current_dir(env.repo_dir.path())
         .output()
         .unwrap();
@@ -65,16 +67,36 @@ fn test_cleanup_prunes_orphaned_directories_for_deleted_branches() -> Result<()>
     let env = CliTestEnvironment::new()?;
 
     // Create a managed branch via CLI
-    env.run_command(&["create", "feature/to-be-deleted"])?.assert().success();
+    env.run_command(&["create", "feature/to-be-deleted"])?
+        .assert()
+        .success();
     let wt_path = env.worktree_path("feature/to-be-deleted");
     wt_path.assert(predicate::path::is_dir());
 
-    // Delete the branch outside the CLI
-    let output = std::process::Command::new("git")
-        .args(["branch", "-D", "feature/to-be-deleted"]) 
+    // First remove the worktree, then delete the branch outside the CLI
+    let remove_worktree_output = std::process::Command::new("git")
+        .args(["worktree", "remove", "feature-to-be-deleted"])
         .current_dir(env.repo_dir.path())
         .output()
         .unwrap();
+    assert!(
+        remove_worktree_output.status.success(),
+        "Failed to remove worktree: {}",
+        String::from_utf8_lossy(&remove_worktree_output.stderr)
+    );
+
+    let output = std::process::Command::new("git")
+        .args(["branch", "-D", "feature/to-be-deleted"])
+        .current_dir(env.repo_dir.path())
+        .output()
+        .unwrap();
+
+    if !output.status.success() {
+        eprintln!("Git command failed:");
+        eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+        eprintln!("status: {:?}", output.status);
+    }
     assert!(output.status.success());
 
     // Run cleanup
@@ -85,4 +107,3 @@ fn test_cleanup_prunes_orphaned_directories_for_deleted_branches() -> Result<()>
 
     Ok(())
 }
-

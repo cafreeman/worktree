@@ -104,9 +104,7 @@ pub fn remove_worktree_with_provider(
             Ok(_) => {
                 println!("✓ Branch deleted successfully");
                 // Unmark managed status
-                if let Err(e) = storage.unmark_branch_managed(&repo_name, &branch_name) {
-                    println!("⚠ Warning: Failed to unmark managed branch: {}", e);
-                }
+                storage.unmark_branch_managed(&repo_name, &branch_name);
                 // Optionally remove mapping for this branch if desired; keep for cleanup symmetry
             }
             Err(e) => println!("⚠ Warning: Failed to delete branch: {}", e),

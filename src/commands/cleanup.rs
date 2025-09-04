@@ -50,11 +50,12 @@ pub fn cleanup_worktrees() -> Result<()> {
                     println!("   ✓ Deleted branch: {}", branch);
                     cleaned_branches.push(branch.clone());
                     // Unmark as managed and remove mapping
-                    if let Err(e) = storage.unmark_branch_managed(&repo_name, branch) {
-                        println!("   ⚠ Warning: Failed to unmark managed branch {}: {}", branch, e);
-                    }
+                    storage.unmark_branch_managed(&repo_name, branch);
                     if let Err(e) = storage.remove_branch_mapping(&repo_name, branch) {
-                        println!("   ⚠ Warning: Failed to remove branch mapping for {}: {}", branch, e);
+                        println!(
+                            "   ⚠ Warning: Failed to remove branch mapping for {}: {}",
+                            branch, e
+                        );
                     }
                 }
                 Err(e) => {
