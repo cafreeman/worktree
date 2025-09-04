@@ -33,7 +33,7 @@ pub fn cleanup_worktrees() -> Result<()> {
     let mut cleaned_branches = Vec::new();
     let mut cleaned_mappings = Vec::new();
 
-    // Check each branch to see if it has a corresponding worktree directory
+    // Check each branch to see if it is managed and has a missing worktree directory
     for branch in &branches {
         if main_branches.contains(&branch.as_str()) {
             continue;
@@ -41,14 +41,21 @@ pub fn cleanup_worktrees() -> Result<()> {
 
         let worktree_path = storage.get_worktree_path(&repo_name, branch);
 
-        if !worktree_path.exists() {
-            println!("🗑️  Found orphaned branch: {}", branch);
+        if !worktree_path.exists() && storage.is_branch_managed(&repo_name, branch) {
+            println!("🗑️  Found orphaned managed branch: {}", branch);
 
             // Try to delete the branch
             match git_repo.delete_branch(branch) {
                 Ok(_) => {
                     println!("   ✓ Deleted branch: {}", branch);
                     cleaned_branches.push(branch.clone());
+                    // Unmark as managed and remove mapping
+                    if let Err(e) = storage.unmark_branch_managed(&repo_name, branch) {
+                        println!("   ⚠ Warning: Failed to unmark managed branch {}: {}", branch, e);
+                    }
+                    if let Err(e) = storage.remove_branch_mapping(&repo_name, branch) {
+                        println!("   ⚠ Warning: Failed to remove branch mapping for {}: {}", branch, e);
+                    }
                 }
                 Err(e) => {
                     println!("   ⚠ Warning: Could not delete branch {}: {}", branch, e);
@@ -148,6 +155,47 @@ pub fn cleanup_worktrees() -> Result<()> {
         }
         Err(e) => {
             println!("   ⚠ Warning: Could not check git worktree list: {}", e);
+        }
+    }
+
+    // Prune orphaned worktree directories for branches that no longer exist in git
+    // Iterate managed worktrees stored under repo storage and check for branch existence
+    if let Ok(repo_worktrees) = storage.list_repo_worktrees(&repo_name) {
+        for sanitized in repo_worktrees {
+            // Get the original branch name for accurate git checks
+            let original_branch = storage
+                .get_original_branch_name(&repo_name, &sanitized)
+                .unwrap_or(Some(sanitized.clone()))
+                .unwrap_or(sanitized.clone());
+
+            if !branches.contains(&original_branch) {
+                // Branch no longer exists in git; remove directory and clean metadata
+                let path = storage.get_worktree_path(&repo_name, &sanitized);
+                if path.exists() {
+                    println!(
+                        "🗑️  Found orphaned worktree directory for deleted branch: {} ({})",
+                        original_branch,
+                        path.display()
+                    );
+                    if let Err(e) = fs::remove_dir_all(&path) {
+                        println!("   ⚠ Warning: Failed to remove worktree directory: {}", e);
+                    }
+                }
+                if let Err(e) = storage.remove_branch_mapping(&repo_name, &original_branch) {
+                    println!(
+                        "   ⚠ Warning: Failed to remove branch mapping for {}: {}",
+                        original_branch, e
+                    );
+                } else {
+                    cleaned_mappings.push(original_branch.clone());
+                }
+                if let Err(e) = storage.remove_worktree_origin(&repo_name, &original_branch) {
+                    println!(
+                        "   ⚠ Warning: Failed to remove origin info for {}: {}",
+                        original_branch, e
+                    );
+                }
+            }
         }
     }
 

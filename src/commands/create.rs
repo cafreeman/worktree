@@ -134,6 +134,13 @@ fn create_worktree_internal(
     // Store origin information for back navigation
     store_origin_info(&storage, &repo_name, branch, &repo_path)?;
 
+    // Mark branch as managed only if we created it in this operation
+    if create_branch {
+        if let Err(e) = storage.mark_branch_managed(&repo_name, branch) {
+            eprintln!("Warning: Failed to mark branch as managed: {}", e);
+        }
+    }
+
     println!("✓ Worktree created successfully!");
     println!("  Branch: {}", branch);
     println!("  Path: {}", worktree_path.display());
