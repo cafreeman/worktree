@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Managed branch tracking to safely identify branches created via this CLI:
+  - New per-branch markers stored under `~/.worktrees/<repo>/.managed-branches/`
+  - Tracking is resilient and written only after successful creation
+
+### Changed
+
+- Cleanup behavior is now safe and precise:
+  - Only deletes orphan branches that were created by this CLI (managed)
+  - Preserves independent branches that were not created via `worktree`
+  - Prunes orphaned worktree directories and associated metadata if the git branch was deleted externally
+  - Continues to remove orphaned git worktree references
+
+### Tests
+
+- Added integration tests covering selective branch deletion and orphan directory pruning
+
 ## [0.3.0] - 2025-09-02
 
 ### Added
