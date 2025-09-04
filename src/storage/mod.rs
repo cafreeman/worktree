@@ -48,6 +48,15 @@ impl WorktreeStorage {
         self.root_dir.join(repo_name).join(safe_branch_name)
     }
 
+    /// Returns the path to the managed-branch flag file for a given branch
+    fn get_managed_branch_flag_path(&self, repo_name: &str, branch_name: &str) -> PathBuf {
+        let safe_branch_name = Self::sanitize_branch_name(branch_name);
+        self.root_dir
+            .join(repo_name)
+            .join(".managed-branches")
+            .join(safe_branch_name)
+    }
+
     /// Retrieves the original branch name from a sanitized name
     ///
     /// # Errors
@@ -115,6 +124,42 @@ impl WorktreeStorage {
         Ok(())
     }
 
+    /// Removes a mapping entry for the given original branch name
+    ///
+    /// # Errors
+    /// Returns an error if reading or writing the mapping file fails
+    pub fn remove_branch_mapping(&self, repo_name: &str, original_branch: &str) -> Result<()> {
+        let mapping_file = self.root_dir.join(repo_name).join(".branch-mapping");
+
+        if !mapping_file.exists() {
+            return Ok(());
+        }
+
+        let content = std::fs::read_to_string(&mapping_file)?;
+
+        // Keep lines that do not map to this original branch
+        let new_content: String = content
+            .lines()
+            .filter(|line| {
+                if let Some((_sanitized, original)) = line.split_once(" -> ") {
+                    original != original_branch
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let final_content = if new_content.is_empty() {
+            String::new()
+        } else {
+            format!("{}\n", new_content)
+        };
+
+        std::fs::write(&mapping_file, final_content)?;
+        Ok(())
+    }
+
     /// Lists all worktrees for a specific repository
     ///
     /// # Errors
@@ -177,6 +222,44 @@ impl WorktreeStorage {
     #[must_use]
     pub fn get_root_dir(&self) -> &PathBuf {
         &self.root_dir
+    }
+
+    /// Marks a branch as managed by this CLI (created via worktree create)
+    ///
+    /// # Errors
+    /// Returns an error if the marker file cannot be created
+    pub fn mark_branch_managed(&self, repo_name: &str, branch_name: &str) -> Result<()> {
+        let repo_dir = self.root_dir.join(repo_name).join(".managed-branches");
+        std::fs::create_dir_all(&repo_dir)?;
+
+        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
+
+        // Write atomically: write to temp then rename
+        let tmp_path = flag_path.with_extension("tmp");
+        std::fs::write(&tmp_path, b"1")?;
+        std::fs::rename(&tmp_path, &flag_path)?;
+
+        Ok(())
+    }
+
+    /// Checks if a branch is managed by this CLI
+    #[must_use]
+    pub fn is_branch_managed(&self, repo_name: &str, branch_name: &str) -> bool {
+        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
+        flag_path.exists()
+    }
+
+    /// Unmarks a branch as managed by this CLI
+    ///
+    /// # Errors
+    /// Returns an error if file deletion fails unexpectedly
+    pub fn unmark_branch_managed(&self, repo_name: &str, branch_name: &str) -> Result<()> {
+        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
+        if flag_path.exists() {
+            // Ignore error if already removed by concurrent cleanup
+            let _ = std::fs::remove_file(&flag_path);
+        }
+        Ok(())
     }
 
     /// Stores origin information for a worktree
