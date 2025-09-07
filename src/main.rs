@@ -6,6 +6,7 @@ use worktree::commands::{back, cleanup, create, init, jump, list, remove, status
 #[derive(Parser)]
 #[command(name = "worktree")]
 #[command(about = "A CLI tool for managing git worktrees with enhanced features")]
+#[command(version)]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
