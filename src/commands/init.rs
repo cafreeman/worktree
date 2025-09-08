@@ -41,16 +41,17 @@ fn print_bash_integration() {
 
 worktree() {{
     case "$1" in
-        jump)
-            # Handle jump specially - call rust binary and cd to result
+        jump|switch)
+            # Handle jump/switch specially - call rust binary and cd to result
+            local cmd="$1"
             shift
             local result
             if [ $# -eq 0 ]; then
                 # Interactive mode
-                result=$(worktree-bin jump --interactive)
+                result=$(worktree-bin "$cmd" --interactive)
             else
                 # Direct mode
-                result=$(worktree-bin jump "$@")
+                result=$(worktree-bin "$cmd" "$@")
             fi
 
             if [ -n "$result" ]; then
@@ -89,21 +90,21 @@ _worktree_complete() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     local prev="${{COMP_WORDS[COMP_CWORD-1]}}"
 
-    # Handle jump subcommand specially
-    if [ "${{COMP_WORDS[1]}}" = "jump" ]; then
+    # Handle jump/switch subcommand specially
+    if [ "${{COMP_WORDS[1]}}" = "jump" ] || [ "${{COMP_WORDS[1]}}" = "switch" ]; then
         # Trigger interactive mode on empty tab
         if [ "${{#COMP_WORDS[@]}}" -eq 3 ] && [ -z "$cur" ]; then
-            worktree jump
+            worktree "${{COMP_WORDS[1]}}"
             return 0
         fi
         
-        # Complete jump command
+        # Complete jump/switch command
         if [[ "$cur" == -* ]]; then
-            # Complete flags for jump
+            # Complete flags for jump/switch
             COMPREPLY=($(compgen -W "--interactive --current --help" -- "$cur"))
         else
             # Complete worktree names
-            local worktrees=$(worktree-bin jump --list-completions 2>/dev/null)
+            local worktrees=$(worktree-bin "${{COMP_WORDS[1]}}" --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
     elif [ "${{COMP_WORDS[1]}}" = "remove" ]; then
@@ -132,7 +133,7 @@ _worktree_complete() {{
             COMP_WORDS=("${{saved_comp_words[@]}}")
         else
             # Fallback to basic completion
-            COMPREPLY=($(compgen -W "create list remove status sync-config jump back init completions cleanup --help --version" -- "$cur"))
+            COMPREPLY=($(compgen -W "create list remove status sync-config jump switch back init completions cleanup --help --version" -- "$cur"))
         fi
     fi
 }}
@@ -148,16 +149,17 @@ fn print_zsh_integration() {
 
 worktree() {{
     case "$1" in
-        jump)
-            # Handle jump specially - call rust binary and cd to result
+        jump|switch)
+            # Handle jump/switch specially - call rust binary and cd to result
+            local cmd="$1"
             shift
             local result
             if [ $# -eq 0 ]; then
                 # Interactive mode
-                result=$(worktree-bin jump --interactive)
+                result=$(worktree-bin "$cmd" --interactive)
             else
                 # Direct mode
-                result=$(worktree-bin jump "$@")
+                result=$(worktree-bin "$cmd" "$@")
             fi
 
             if [ -n "$result" ]; then
@@ -206,12 +208,12 @@ _worktree() {{
     typeset -A opt_args
     
     case "${{words[2]}}" in
-        jump)
-            # Handle jump subcommand specially
+        jump|switch)
+            # Handle jump/switch subcommand specially
             if [[ ${{#words[@]}} -le 3 && "${{words[CURRENT]}}" != -* ]]; then
-                # Complete worktree names for jump command
+                # Complete worktree names for jump/switch command
                 local -a worktrees
-                worktrees=($(worktree-bin jump --list-completions 2>/dev/null))
+                worktrees=($(worktree-bin "${{words[2]}}" --list-completions 2>/dev/null))
                 if [[ ${{#worktrees[@]}} -gt 0 ]]; then
                     _describe 'worktrees' worktrees
                 else
@@ -219,7 +221,7 @@ _worktree() {{
                 fi
                 return 0
             elif [[ "${{words[CURRENT]}}" == -* ]]; then
-                # Complete flags for jump command
+                # Complete flags for jump/switch command
                 _arguments -s : \
                     '--interactive[Launch interactive selection mode]' \
                     '--current[Current repo only]' \
@@ -272,6 +274,7 @@ _worktree() {{
                         'status:Show worktree status'
                         'sync-config:Sync config files between worktrees'
                         'jump:Jump to a worktree directory'
+                        'switch:Switch to a worktree directory (alias for jump)'
                         'back:Navigate back to the original repository'
                         'init:Generate shell integration'
                         'completions:Generate shell completions'
@@ -299,16 +302,17 @@ fn print_fish_integration() {
 
 function worktree
     switch $argv[1]
-        case jump
-            # Handle jump specially - call rust binary and cd to result
+        case jump switch
+            # Handle jump/switch specially - call rust binary and cd to result
+            set cmd $argv[1]
             set -e argv[1]
             set result
             if test (count $argv) -eq 0
                 # Interactive mode
-                set result (worktree-bin jump --interactive)
+                set result (worktree-bin $cmd --interactive)
             else
                 # Direct mode
-                set result (worktree-bin jump $argv)
+                set result (worktree-bin $cmd $argv)
             end
 
             if test -n "$result"
@@ -331,8 +335,9 @@ if command -q worktree-bin
     eval (worktree-bin completions fish 2>/dev/null)
 end
 
-# Override the jump and remove argument completions to add custom worktree names
+# Override the jump, switch, and remove argument completions to add custom worktree names
 complete -c worktree -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c worktree -n '__fish_seen_subcommand_from switch' -a '(worktree-bin switch --list-completions 2>/dev/null)' -d 'Available worktrees'
 complete -c worktree -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
 
 # The clap-generated completions handle all other subcommands and flags"#

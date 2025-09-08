@@ -23,7 +23,7 @@ cargo install worktree
 
 ### 2. Set Up Shell Integration
 
-**Important:** The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and provides enhanced tab completions automatically. Without this integration, `worktree jump` and `worktree back` won't be able to change your current directory.
+**Important:** The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and provides enhanced tab completions automatically. Without this integration, `worktree jump`/`worktree switch` and `worktree back` won't be able to change your current directory.
 
 Add the following to your shell configuration:
 
@@ -55,6 +55,7 @@ worktree-bin init fish | source
 | `create <branch>`         | Create a new worktree for the specified branch            |
 | `list`                    | List all worktrees across all repositories                |
 | `jump [branch]`           | Switch to a worktree (interactive if no branch specified) |
+| `switch [branch]`         | Alias for `jump` - switch to a worktree                   |
 | `remove [branch]`         | Remove a worktree (interactive if no branch specified)    |
 | `status`                  | Show detailed status of current worktree and branches     |
 | `sync-config <from> <to>` | Copy config files between worktrees                       |
@@ -65,9 +66,9 @@ worktree-bin init fish | source
 
 ### Tab Completion & Interactive Selection
 
-- **`jump`** without arguments opens an interactive worktree selector
+- **`jump`/`switch`** without arguments opens an interactive worktree selector
 - **`remove`** without arguments opens an interactive removal menu
-- **Tab completion** shows available worktrees for `jump` and `remove` commands
+- **Tab completion** shows available worktrees for `jump`, `switch`, and `remove` commands
 - **Empty tab** in bash/zsh automatically launches interactive mode
 
 ### Autocomplete
@@ -94,13 +95,15 @@ worktree create bugfix/security-patch
 ### 2. Jump Between Contexts
 
 ```bash
-# Switch to auth feature
+# Switch to auth feature (using jump or switch alias)
 worktree jump feature/user-auth
+# or
+worktree switch feature/user-auth
 
 # Work with your LLM assistant on authentication...
 
 # Quickly switch to payment feature
-worktree jump feature/payment-system
+worktree switch feature/payment-system
 
 # Work on payment system while auth context is preserved...
 ```
