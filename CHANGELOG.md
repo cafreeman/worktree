@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Remove: `--force-delete-branch` flag to allow deleting unmanaged branches
+- **Command Aliases:**
+  - Added `switch` as an alias for the `jump` command for more intuitive navigation
+  - Users can now use either `worktree jump` or `worktree switch` interchangeably
+  - Alias is visible in help text and supports all the same options and functionality
 
 ### Fixed
 
