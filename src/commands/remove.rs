@@ -103,7 +103,10 @@ pub fn remove_worktree_with_provider(
             match storage.get_original_branch_name(&repo_name, sanitized) {
                 Ok(Some(original)) => {
                     if original != branch_name {
-                        println!("Resolved branch from mapping: {} (was: {})", original, branch_name);
+                        println!(
+                            "Resolved branch from mapping: {} (was: {})",
+                            original, branch_name
+                        );
                     }
                     original
                 }
@@ -124,13 +127,14 @@ pub fn remove_worktree_with_provider(
         .and_then(|name| name.to_str())
         .unwrap_or(&branch_name);
 
-    git_repo
-        .remove_worktree(worktree_name)
-        .context("Failed to remove worktree from git")?;
-
+    // Remove the filesystem directory first so prune can delete git metadata cleanly
     if worktree_path.exists() {
         fs::remove_dir_all(&worktree_path).context("Failed to remove worktree directory")?;
     }
+
+    git_repo
+        .remove_worktree(worktree_name)
+        .context("Failed to remove worktree from git")?;
 
     // Clean up origin information
     if let Err(e) = storage.remove_worktree_origin(&repo_name, &resolved_branch_name) {
@@ -153,7 +157,8 @@ pub fn remove_worktree_with_provider(
                     // Unmark managed status
                     storage.unmark_branch_managed(&repo_name, &resolved_branch_name);
                     // Remove mapping for this branch
-                    if let Err(e) = storage.remove_branch_mapping(&repo_name, &resolved_branch_name) {
+                    if let Err(e) = storage.remove_branch_mapping(&repo_name, &resolved_branch_name)
+                    {
                         println!("⚠ Warning: Failed to remove branch mapping: {}", e);
                     }
                 }

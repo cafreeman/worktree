@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
+#![allow(clippy::expect_used)] // Tests may use expect for clearer failure messages
 
 //! Modern integration tests for the remove command
 //!
@@ -80,22 +81,23 @@ fn test_remove_without_mapping_uses_head_resolution() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree with a branch that would be sanitized
-    env.run_command(&["create", "feature/slashed/branch"])?.assert().success();
+    env.run_command(&["create", "feature/slashed/branch"])?
+        .assert()
+        .success();
 
     let worktree_path = env.worktree_path("feature/slashed/branch");
     worktree_path.assert(predicate::path::is_dir());
 
     // Delete mapping file to simulate missing mapping
-    let mapping_file = env
-        .storage_dir
-        .child("test_repo")
-        .child(".branch-mapping");
+    let mapping_file = env.storage_dir.child("test_repo").child(".branch-mapping");
     if mapping_file.path().exists() {
         std::fs::remove_file(mapping_file.path()).ok();
     }
 
     // Remove worktree and delete branch (default)
-    env.run_command(&["remove", "feature/slashed/branch"])?.assert().success();
+    env.run_command(&["remove", "feature/slashed/branch"])?
+        .assert()
+        .success();
 
     worktree_path.assert(predicate::path::missing());
 
@@ -111,29 +113,44 @@ fn test_unmanaged_branch_skip_and_force_delete() -> Result<()> {
     {
         let repo = env.repo_dir.path();
         std::process::Command::new("git")
-            .args(["checkout", "-b", "feature/manual-branch"]) 
+            .args(["checkout", "-b", "feature/manual-branch"])
             .current_dir(repo)
             .status()
             .expect("git checkout -b should run");
+
+        // Switch back to previous branch so the branch is not checked out anywhere
+        std::process::Command::new("git")
+            .args(["checkout", "-"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout - to previous branch should run");
     }
 
     // Create worktree for that branch (existing branch)
-    env.run_command(&["create", "feature/manual-branch"])?.assert().success();
+    env.run_command(&["create", "feature/manual-branch"])?
+        .assert()
+        .success();
 
     let wt = env.worktree_path("feature/manual-branch");
     wt.assert(predicate::path::is_dir());
 
     // Remove without force: should remove worktree; branch remains (we don't assert git state here)
-    env.run_command(&["remove", "feature/manual-branch"])?.assert().success();
+    env.run_command(&["remove", "feature/manual-branch"])?
+        .assert()
+        .success();
     wt.assert(predicate::path::missing());
 
     // Recreate worktree for same branch
-    env.run_command(&["create", "feature/manual-branch"])?.assert().success();
+    env.run_command(&["create", "feature/manual-branch"])?
+        .assert()
+        .success();
     let wt2 = env.worktree_path("feature/manual-branch");
     wt2.assert(predicate::path::is_dir());
 
     // Remove with force flag to delete unmanaged branch
-    env.run_command(&["remove", "feature/manual-branch", "--force-delete-branch"])?.assert().success();
+    env.run_command(&["remove", "feature/manual-branch", "--force-delete-branch"])?
+        .assert()
+        .success();
     wt2.assert(predicate::path::missing());
 
     Ok(())
@@ -145,7 +162,9 @@ fn test_remove_detached_head_skips_branch_deletion() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree
-    env.run_command(&["create", "feature/detached"])?.assert().success();
+    env.run_command(&["create", "feature/detached"])?
+        .assert()
+        .success();
 
     let wt = env.worktree_path("feature/detached");
     wt.assert(predicate::path::is_dir());
@@ -159,7 +178,9 @@ fn test_remove_detached_head_skips_branch_deletion() -> Result<()> {
         .expect("git checkout --detach should run");
 
     // Remove should succeed and skip branch deletion
-    env.run_command(&["remove", "feature/detached"])?.assert().success();
+    env.run_command(&["remove", "feature/detached"])?
+        .assert()
+        .success();
 
     wt.assert(predicate::path::missing());
     Ok(())

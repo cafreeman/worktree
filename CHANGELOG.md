@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Remove: `--force-delete-branch` flag to allow deleting unmanaged branches
+
+### Fixed
+
+- Remove: Resolve canonical branch from worktree HEAD before pruning to avoid
+  intermittent branch NotFound errors when mapping is missing or sanitized names
+  differ from canonical names
+- Remove: Fallback to storage mapping when HEAD resolution fails; otherwise
+  skip deletion with a clear warning
+- Remove: Clean up branch mapping and origin metadata after successful deletion
+
+### Changed
+
+- Remove: By default, skip deleting branches not managed by this CLI; require
+  `--force-delete-branch` to delete unmanaged branches
+
 ## [0.3.1] - 2025-09-04
 
 ### Added
