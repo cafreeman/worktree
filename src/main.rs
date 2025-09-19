@@ -77,6 +77,7 @@ enum Commands {
         shell: Shell,
     },
     /// Jump to a worktree directory
+    #[command(visible_alias = "switch")]
     Jump {
         /// Target worktree (branch name). If not provided, opens interactive selection
         #[arg(value_hint = ValueHint::Other)]
