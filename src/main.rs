@@ -40,6 +40,9 @@ enum Commands {
         /// Keep the branch (only remove the worktree)
         #[arg(long)]
         keep_branch: bool,
+        /// Force deletion of branch even if unmanaged
+        #[arg(long)]
+        force_delete_branch: bool,
         /// Launch interactive selection mode
         #[arg(long)]
         interactive: bool,
@@ -118,6 +121,7 @@ fn main() -> Result<()> {
         Commands::Remove {
             target,
             keep_branch,
+            force_delete_branch,
             interactive,
             list_completions,
             current,
@@ -125,6 +129,7 @@ fn main() -> Result<()> {
             remove::remove_worktree(
                 target.as_deref(),
                 !keep_branch,
+                force_delete_branch,
                 interactive,
                 list_completions,
                 current,

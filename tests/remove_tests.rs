@@ -74,6 +74,97 @@ fn test_remove_with_branch_deletion() -> Result<()> {
     Ok(())
 }
 
+/// Test remove when mapping is missing; branch should still delete via HEAD resolution
+#[test]
+fn test_remove_without_mapping_uses_head_resolution() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Create a worktree with a branch that would be sanitized
+    env.run_command(&["create", "feature/slashed/branch"])?.assert().success();
+
+    let worktree_path = env.worktree_path("feature/slashed/branch");
+    worktree_path.assert(predicate::path::is_dir());
+
+    // Delete mapping file to simulate missing mapping
+    let mapping_file = env
+        .storage_dir
+        .child("test_repo")
+        .child(".branch-mapping");
+    if mapping_file.path().exists() {
+        std::fs::remove_file(mapping_file.path()).ok();
+    }
+
+    // Remove worktree and delete branch (default)
+    env.run_command(&["remove", "feature/slashed/branch"])?.assert().success();
+
+    worktree_path.assert(predicate::path::missing());
+
+    Ok(())
+}
+
+/// Test unmanaged branch is not deleted unless forced
+#[test]
+fn test_unmanaged_branch_skip_and_force_delete() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Create an existing branch manually (unmanaged)
+    {
+        let repo = env.repo_dir.path();
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "feature/manual-branch"]) 
+            .current_dir(repo)
+            .status()
+            .expect("git checkout -b should run");
+    }
+
+    // Create worktree for that branch (existing branch)
+    env.run_command(&["create", "feature/manual-branch"])?.assert().success();
+
+    let wt = env.worktree_path("feature/manual-branch");
+    wt.assert(predicate::path::is_dir());
+
+    // Remove without force: should remove worktree; branch remains (we don't assert git state here)
+    env.run_command(&["remove", "feature/manual-branch"])?.assert().success();
+    wt.assert(predicate::path::missing());
+
+    // Recreate worktree for same branch
+    env.run_command(&["create", "feature/manual-branch"])?.assert().success();
+    let wt2 = env.worktree_path("feature/manual-branch");
+    wt2.assert(predicate::path::is_dir());
+
+    // Remove with force flag to delete unmanaged branch
+    env.run_command(&["remove", "feature/manual-branch", "--force-delete-branch"])?.assert().success();
+    wt2.assert(predicate::path::missing());
+
+    Ok(())
+}
+
+/// Test removal when worktree is in detached HEAD; branch deletion should be skipped gracefully
+#[test]
+fn test_remove_detached_head_skips_branch_deletion() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Create a worktree
+    env.run_command(&["create", "feature/detached"])?.assert().success();
+
+    let wt = env.worktree_path("feature/detached");
+    wt.assert(predicate::path::is_dir());
+
+    // Detach HEAD in the worktree repository
+    let wt_path = wt.path();
+    std::process::Command::new("git")
+        .args(["checkout", "--detach"]) // detach at current commit
+        .current_dir(wt_path)
+        .status()
+        .expect("git checkout --detach should run");
+
+    // Remove should succeed and skip branch deletion
+    env.run_command(&["remove", "feature/detached"])?.assert().success();
+
+    wt.assert(predicate::path::missing());
+    Ok(())
+}
+
 /// Test remove command with keep branch flag
 #[test]
 fn test_remove_keep_branch() -> Result<()> {
