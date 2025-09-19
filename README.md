@@ -116,7 +116,14 @@ worktree status
 worktree sync-config feature/user-auth feature/payment-system
 
 # Clean up completed features
+# By default, branch will be deleted only if it was created by this CLI
 worktree remove feature/user-auth
+
+# To keep the branch
+worktree remove feature/user-auth --keep-branch
+
+# To force-delete an unmanaged branch (e.g., created outside this CLI)
+worktree remove feature/user-auth --force-delete-branch
 
 # Return to main repo
 worktree back
