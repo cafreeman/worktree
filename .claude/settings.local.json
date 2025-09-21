@@ -16,7 +16,8 @@
       "WebSearch",
       "Bash(rustc --version)",
       "Bash(cargo --version)",
-      "mcp__codanna__get_index_info"
+      "mcp__codanna__get_index_info",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": []

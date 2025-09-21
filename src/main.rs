@@ -16,15 +16,24 @@ pub struct Cli {
 enum Commands {
     /// Create a new worktree
     Create {
-        /// Branch name for the worktree
+        /// Branch name for the worktree (if not provided, will prompt interactively)
         #[arg(value_hint = ValueHint::Other)]
-        branch: String,
+        branch: Option<String>,
+        /// Starting point for new branch (branch, commit, tag)
+        #[arg(long)]
+        from: Option<String>,
         /// Force creation of a new branch (fail if it already exists)
         #[arg(long, conflicts_with = "existing_branch")]
         new_branch: bool,
         /// Only use an existing branch (fail if it doesn't exist)
         #[arg(long, conflicts_with = "new_branch")]
         existing_branch: bool,
+        /// Launch interactive selection for --from reference
+        #[arg(long)]
+        interactive_from: bool,
+        /// List available git references for completion (internal use)
+        #[arg(long, hide = true)]
+        list_from_completions: bool,
     },
     /// List all worktrees
     List {
@@ -104,17 +113,61 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Create {
             branch,
+            from,
             new_branch,
             existing_branch,
+            interactive_from,
+            list_from_completions,
         } => {
-            let mode = if new_branch {
-                create::CreateMode::NewBranch
-            } else if existing_branch {
-                create::CreateMode::ExistingBranch
-            } else {
-                create::CreateMode::Smart
-            };
-            create::create_worktree(&branch, mode)?;
+            if list_from_completions {
+                create::list_git_ref_completions()?;
+                return Ok(());
+            }
+
+            // Handle different execution modes
+            match (branch, from, interactive_from) {
+                // No branch provided - launch full interactive workflow
+                (None, None, false) => {
+                    create::interactive_create_workflow()?;
+                }
+                // Branch provided but wants interactive --from selection
+                (Some(branch_name), None, true) => {
+                    create::interactive_from_selection(&branch_name)?;
+                }
+                // Traditional command-line usage
+                (Some(branch_name), from_ref, false) => {
+                    let mode = if new_branch {
+                        create::CreateMode::NewBranch
+                    } else if existing_branch {
+                        create::CreateMode::ExistingBranch
+                    } else {
+                        create::CreateMode::Smart
+                    };
+                    create::create_worktree(&branch_name, from_ref.as_deref(), mode)?;
+                }
+                // Invalid combinations
+                (None, Some(_), _) => {
+                    anyhow::bail!(
+                        "Cannot specify --from without a branch name. Use interactive mode instead."
+                    );
+                }
+                (None, None, true) => {
+                    anyhow::bail!(
+                        "--interactive-from requires a branch name. Use interactive mode instead."
+                    );
+                }
+                // Branch provided with from_ref AND interactive_from - use the from_ref
+                (Some(branch_name), Some(from_ref), true) => {
+                    let mode = if new_branch {
+                        create::CreateMode::NewBranch
+                    } else if existing_branch {
+                        create::CreateMode::ExistingBranch
+                    } else {
+                        create::CreateMode::Smart
+                    };
+                    create::create_worktree(&branch_name, Some(&from_ref), mode)?;
+                }
+            }
         }
         Commands::List { current } => {
             list::list_worktrees(current)?;
