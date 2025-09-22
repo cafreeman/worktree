@@ -40,6 +40,9 @@ impl CliTestEnvironment {
         repo_dir.child("README.md").write_str("# Test Repo")?;
         Self::run_git_command(&repo_dir, &["add", "."])?;
         Self::run_git_command(&repo_dir, &["commit", "-m", "Initial commit"])?;
+        
+        // Ensure we have a main branch (some git versions default to 'master')
+        Self::run_git_command(&repo_dir, &["branch", "-M", "main"])?;
 
         Ok(Self {
             repo_dir,
@@ -84,6 +87,16 @@ impl CliTestEnvironment {
         // Use the same sanitization logic as the main application
         let sanitized = branch_name.replace('/', "-");
         self.storage_dir.child("test_repo").child(&sanitized)
+    }
+    
+    /// Check if we're running in a CI environment (where TTY is not available)
+    pub fn is_ci() -> bool {
+        // Check for common CI environment variables
+        std::env::var("CI").is_ok() || 
+        std::env::var("GITHUB_ACTIONS").is_ok() ||
+        std::env::var("GITLAB_CI").is_ok() ||
+        std::env::var("TRAVIS").is_ok() ||
+        std::env::var("CIRCLECI").is_ok()
     }
 }
 

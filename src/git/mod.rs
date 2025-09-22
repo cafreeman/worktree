@@ -51,10 +51,32 @@ impl GitRepo {
         worktree_path: &Path,
         create_branch: bool,
     ) -> Result<()> {
+        self.create_worktree_from(branch_name, worktree_path, create_branch, None)
+    }
+
+    /// Creates a new worktree for the specified branch from a specific starting point
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Failed to create the worktree
+    /// - Branch doesn't exist and create_branch is false
+    /// - Failed to resolve the starting reference
+    /// - Git operations fail
+    pub fn create_worktree_from(
+        &self,
+        branch_name: &str,
+        worktree_path: &Path,
+        create_branch: bool,
+        from_ref: Option<&str>,
+    ) -> Result<()> {
         // Create branch if needed
         if create_branch {
-            let head = self.repo.head()?;
-            let target_commit = head.peel_to_commit()?;
+            let target_commit = if let Some(from_ref) = from_ref {
+                self.resolve_reference(from_ref)?
+            } else {
+                let head = self.repo.head()?;
+                head.peel_to_commit()?
+            };
             self.repo.branch(branch_name, &target_commit, false)?;
         }
 
@@ -78,6 +100,22 @@ impl GitRepo {
             .worktree(worktree_name, worktree_path, Some(&opts))?;
 
         Ok(())
+    }
+
+    /// Resolves a git reference (branch, tag, commit) to a commit object
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The reference cannot be found
+    /// - The reference cannot be resolved to a commit
+    /// - Git operations fail
+    pub fn resolve_reference(&self, reference: &str) -> Result<git2::Commit<'_>> {
+        let obj = self
+            .repo
+            .revparse_single(reference)
+            .with_context(|| format!("Failed to resolve reference '{}'", reference))?;
+        obj.peel_to_commit()
+            .with_context(|| format!("Reference '{}' does not point to a commit", reference))
     }
 
     /// Removes a worktree from the repository
@@ -131,6 +169,39 @@ impl GitRepo {
         }
 
         Ok(branch_names)
+    }
+
+    /// Lists all remote branches in the repository
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
+    pub fn list_remote_branches(&self) -> Result<Vec<String>> {
+        let branches = self.repo.branches(Some(BranchType::Remote))?;
+        let mut branch_names = Vec::new();
+
+        for branch_result in branches {
+            let (branch, _) = branch_result?;
+            if let Some(name) = branch.name()? {
+                branch_names.push(name.to_string());
+            }
+        }
+
+        Ok(branch_names)
+    }
+
+    /// Lists all tags in the repository
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
+    pub fn list_tags(&self) -> Result<Vec<String>> {
+        let tags = self.repo.tag_names(None)?;
+        let mut tag_names = Vec::new();
+
+        for tag in tags.iter().flatten() {
+            tag_names.push(tag.to_string());
+        }
+
+        Ok(tag_names)
     }
 
     /// Enables worktree-specific configuration and copies parent repo's effective config
@@ -326,6 +397,16 @@ impl GitOperations for GitRepo {
         self.create_worktree(branch_name, worktree_path, create_branch)
     }
 
+    fn create_worktree_from(
+        &self,
+        branch_name: &str,
+        worktree_path: &Path,
+        create_branch: bool,
+        from_ref: Option<&str>,
+    ) -> Result<()> {
+        self.create_worktree_from(branch_name, worktree_path, create_branch, from_ref)
+    }
+
     fn remove_worktree(&self, worktree_name: &str) -> Result<()> {
         self.remove_worktree(worktree_name)
     }
@@ -340,5 +421,17 @@ impl GitOperations for GitRepo {
 
     fn inherit_config(&self, worktree_path: &Path) -> Result<()> {
         self.inherit_config(worktree_path)
+    }
+
+    fn list_local_branches(&self) -> Result<Vec<String>> {
+        self.list_local_branches()
+    }
+
+    fn list_remote_branches(&self) -> Result<Vec<String>> {
+        self.list_remote_branches()
+    }
+
+    fn list_tags(&self) -> Result<Vec<String>> {
+        self.list_tags()
     }
 }

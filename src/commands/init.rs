@@ -66,6 +66,16 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
+        create)
+            # Handle create specially - support interactive workflow
+            if [ $# -eq 1 ]; then
+                # No arguments provided - launch interactive workflow
+                worktree-bin create
+            else
+                # Arguments provided - pass through normally
+                worktree-bin "$@"
+            fi
+            ;;
         *)
             # Delegate everything else to the rust binary
             worktree-bin "$@"
@@ -85,7 +95,7 @@ if command -v worktree-bin >/dev/null 2>&1; then
     fi
 fi
 
-# Enhanced completion for the worktree shell function  
+# Enhanced completion for the worktree shell function
 _worktree_complete() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     local prev="${{COMP_WORDS[COMP_CWORD-1]}}"
@@ -97,7 +107,7 @@ _worktree_complete() {{
             worktree "${{COMP_WORDS[1]}}"
             return 0
         fi
-        
+
         # Complete jump/switch command
         if [[ "$cur" == -* ]]; then
             # Complete flags for jump/switch
@@ -113,7 +123,7 @@ _worktree_complete() {{
             worktree remove --interactive
             return 0
         fi
-        
+
         # Complete remove command
         if [[ "$cur" == -* ]]; then
             # Complete flags for remove
@@ -122,6 +132,43 @@ _worktree_complete() {{
             # Complete worktree names
             local worktrees=$(worktree-bin remove --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
+        fi
+    elif [ "${{COMP_WORDS[1]}}" = "create" ]; then
+        # Handle create command specially for --from flag completion
+        if [ "$prev" = "--from" ]; then
+            # Get git references for completion
+            local git_refs=$(worktree-bin create dummy --list-from-completions 2>/dev/null)
+
+            # Check if we got any references
+            if [[ -z "$git_refs" ]]; then
+                COMPREPLY=()
+                return
+            fi
+
+            # Enable programmable completion with fuzzy matching
+            # This allows partial matches anywhere in the string
+            local IFS=$'\n'
+            local filtered_refs=()
+
+            if [[ -n "$cur" ]]; then
+                # Filter refs that contain the current input (case-insensitive)
+                while IFS= read -r ref; do
+                    if [[ -n "$ref" && "${{ref,,}}" == *"${{cur,,}}"* ]]; then
+                        filtered_refs+=("$ref")
+                    fi
+                done <<< "$git_refs"
+
+                if [[ ${{#filtered_refs[@]}} -gt 0 ]]; then
+                    COMPREPLY=($(printf '%s\n' "${{filtered_refs[@]}}" | head -20))
+                else
+                    COMPREPLY=($(printf '%s\n' $git_refs | head -20))
+                fi
+            else
+                COMPREPLY=($(printf '%s\n' $git_refs | head -20))
+            fi
+        elif [[ "$cur" == -* ]] || [ "${{#COMP_WORDS[@]}}" -eq 2 ]; then
+            # Complete flags for create command (when typing flags or at the beginning)
+            COMPREPLY=($(compgen -W "--from --new-branch --existing-branch --interactive-from --help" -- "$cur"))
         fi
     else
         # For all other commands, delegate to clap completion if available
@@ -174,6 +221,16 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
+        create)
+            # Handle create specially - support interactive workflow
+            if [ $# -eq 1 ]; then
+                # No arguments provided - launch interactive workflow
+                worktree-bin create
+            else
+                # Arguments provided - pass through normally
+                worktree-bin "$@"
+            fi
+            ;;
         *)
             # Delegate everything else to the rust binary
             worktree-bin "$@"
@@ -202,11 +259,66 @@ if command -v worktree-bin >/dev/null 2>&1; then
     unfunction __worktree_load_completions
 fi
 
+# Helper function for git reference completion
+_worktree_git_refs() {{
+    local -a all_refs local_branches remote_branches tags
+    all_refs=($(worktree-bin create dummy --list-from-completions 2>/dev/null))
+
+    if [[ ${{#all_refs[@]}} -gt 0 ]]; then
+        # Separate references by type
+        for ref in "${{all_refs[@]}}"; do
+            case "$ref" in
+                origin/*)
+                    remote_branches+=("$ref")
+                    ;;
+                v[0-9]*|*.[0-9]*|*-[0-9]*)
+                    tags+=("$ref")
+                    ;;
+                *)
+                    local_branches+=("$ref")
+                    ;;
+            esac
+        done
+
+        # Configure single-column display and fuzzy matching
+        zstyle ':completion:*:git-references:*' list-grouped true
+        zstyle ':completion:*:git-references:*' format '%B%F{{cyan}}%d%f%b'
+        zstyle ':completion:*:git-references:*' matcher-list 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+        zstyle ':completion:*:git-references:*' list-packed false
+        zstyle ':completion:*:git-references:*' list-columns 1
+
+        # Present grouped completions
+        if [[ ${{#local_branches[@]}} -gt 0 ]]; then
+            _describe -t local-branches 'Local Branches' local_branches
+        fi
+        if [[ ${{#remote_branches[@]}} -gt 0 ]]; then
+            _describe -t remote-branches 'Remote Branches' remote_branches
+        fi
+        if [[ ${{#tags[@]}} -gt 0 ]]; then
+            _describe -t tags 'Tags' tags
+        fi
+    else
+        _message 'no git references available'
+    fi
+}}
+
+# Fallback function for when user types partial reference name
+_worktree_git_refs_fallback() {{
+    local -a all_refs
+    all_refs=($(worktree-bin create dummy --list-from-completions 2>/dev/null))
+
+    if [[ ${{#all_refs[@]}} -gt 0 ]]; then
+        _describe 'git references' all_refs
+    else
+        _message 'no git references available'
+    fi
+}}
+
 # Create our custom _worktree function for the shell wrapper
 _worktree() {{
     local line state context curcontext="$curcontext"
     typeset -A opt_args
-    
+
     case "${{words[2]}}" in
         jump|switch)
             # Handle jump/switch subcommand specially
@@ -253,6 +365,18 @@ _worktree() {{
                 return 0
             fi
             ;;
+        create)
+            # Handle create subcommand with standard argument completion
+            _arguments -s : \
+                '--from=[Starting point for new branch]:FROM:_worktree_git_refs_fallback' \
+                '--new-branch[Force creation of a new branch]' \
+                '--existing-branch[Only use an existing branch]' \
+                '--interactive-from[Launch interactive selection for --from reference]' \
+                '--help[Print help]' \
+                '-h[Print help]' \
+                ':branch -- Branch name for the worktree:'
+            return 0
+            ;;
         *)
             # For all other commands, delegate to clap completions if available
             if [[ "$_worktree_clap_available" = "true" ]]; then
@@ -269,7 +393,7 @@ _worktree() {{
                     local -a subcommands
                     subcommands=(
                         'create:Create a new worktree'
-                        'list:List all worktrees'  
+                        'list:List all worktrees'
                         'remove:Remove a worktree'
                         'status:Show worktree status'
                         'sync-config:Sync config files between worktrees'
@@ -324,6 +448,15 @@ function worktree
             if test -n "$result"
                 cd "$result"
             end
+        case create
+            # Handle create specially - support interactive workflow
+            if test (count $argv) -eq 1
+                # No arguments provided - launch interactive workflow
+                worktree-bin create
+            else
+                # Arguments provided - pass through normally
+                worktree-bin $argv
+            end
         case '*'
             # Delegate everything else to the rust binary
             worktree-bin $argv
@@ -339,6 +472,9 @@ end
 complete -c worktree -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
 complete -c worktree -n '__fish_seen_subcommand_from switch' -a '(worktree-bin switch --list-completions 2>/dev/null)' -d 'Available worktrees'
 complete -c worktree -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
+
+# Override the --from flag completion for create command
+complete -c worktree -n '__fish_seen_subcommand_from create' -l from -a '(worktree-bin create dummy --list-from-completions 2>/dev/null)' -d 'Git references'
 
 # The clap-generated completions handle all other subcommands and flags"#
     );

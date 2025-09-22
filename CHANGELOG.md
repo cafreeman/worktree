@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Enhanced
+
+- **Interactive Git Reference Selection:**
+  - Improved `worktree create` interactive workflow with hierarchical git reference selection
+  - Two-step selection process: first choose category (Local Branches, Remote Branches, Tags), then select specific reference
+  - Eliminates confusion from trying to select non-selectable separator items
+  - Enhanced user experience with clear categorization and item counts for each group
+  - Maintains all existing functionality while providing cleaner navigation for complex repositories
+
 ## [0.3.2] - 2025-09-19
 
 ### Added

@@ -1,8 +1,13 @@
 use anyhow::{Context, Result};
+use inquire::validator::Validation;
+use std::error::Error;
 use std::path::Path;
 
 use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
+use crate::selection::{
+    RealSelectionProvider, SelectionProvider, select_git_reference_interactive,
+};
 use crate::storage::WorktreeStorage;
 
 /// Mode for creating worktrees
@@ -25,10 +30,10 @@ pub enum CreateMode {
 /// - The branch exists and mode is NewBranch
 /// - Failed to create the worktree directory
 /// - Git operations fail
-pub fn create_worktree(branch: &str, mode: CreateMode) -> Result<()> {
+pub fn create_worktree(branch: &str, from: Option<&str>, mode: CreateMode) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    create_worktree_internal(&git_repo, branch, mode)
+    create_worktree_internal(&git_repo, branch, from, mode)
 }
 
 /// Test version that accepts a mock git repository
@@ -42,14 +47,16 @@ pub fn create_worktree(branch: &str, mode: CreateMode) -> Result<()> {
 pub fn create_worktree_with_git(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
+    from: Option<&str>,
     mode: CreateMode,
 ) -> Result<()> {
-    create_worktree_internal(git_repo, branch, mode)
+    create_worktree_internal(git_repo, branch, from, mode)
 }
 
 fn create_worktree_internal(
     git_repo: &dyn crate::traits::GitOperations,
     branch: &str,
+    from: Option<&str>,
     mode: CreateMode,
 ) -> Result<()> {
     let repo_path = git_repo.get_repo_path();
@@ -110,7 +117,7 @@ fn create_worktree_internal(
         println!("Using existing branch: {}", branch);
     }
 
-    git_repo.create_worktree(branch, &worktree_path, create_branch)?;
+    git_repo.create_worktree_from(branch, &worktree_path, create_branch, from)?;
 
     // Inherit git configuration from parent repository
     println!("Inheriting git configuration from parent repository...");
@@ -277,6 +284,138 @@ fn store_origin_info(
             &canonical_repo_path.to_string_lossy(),
         )
         .context("Failed to store worktree origin information")?;
+
+    Ok(())
+}
+
+/// Lists all git references (branches and tags) for shell completion
+///
+/// # Errors
+/// Returns an error if:
+/// - The current directory is not a git repository
+/// - Git operations fail
+pub fn list_git_ref_completions() -> Result<()> {
+    let current_dir = std::env::current_dir()?;
+    let git_repo = GitRepo::open(&current_dir)?;
+
+    // Get all local branches
+    let local_branches = git_repo
+        .list_local_branches()
+        .context("Failed to list local branches")?;
+
+    // Get all remote branches
+    let remote_branches = git_repo
+        .list_remote_branches()
+        .context("Failed to list remote branches")?;
+
+    // Get all tags
+    let tags = git_repo.list_tags().context("Failed to list tags")?;
+
+    // Print all references for completion
+    for branch in local_branches {
+        println!("{}", branch);
+    }
+
+    for branch in remote_branches {
+        println!("{}", branch);
+    }
+
+    for tag in tags {
+        println!("{}", tag);
+    }
+
+    Ok(())
+}
+
+/// Handle interactive selection for --from flag
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to open git repository
+/// - Interactive selection fails
+/// - Selected reference is invalid
+pub fn interactive_from_selection(branch: &str) -> Result<()> {
+    // Get current git repository
+    let current_dir = std::env::current_dir()?;
+    let git_repo = GitRepo::open(&current_dir)?;
+
+    // Launch interactive selection
+    let provider = RealSelectionProvider;
+    let selected_ref = select_git_reference_interactive(&git_repo, &provider)?;
+
+    // Execute create with selected reference
+    let mode = CreateMode::Smart; // Use smart mode as default
+    create_worktree(branch, Some(&selected_ref), mode)?;
+
+    Ok(())
+}
+
+/// Branch name validator - checks for valid branch name format
+#[must_use]
+pub fn validate_branch_name_internal(input: &str) -> Validation {
+    let trimmed = input.trim();
+
+    if trimmed.is_empty() {
+        return Validation::Invalid("Branch name cannot be empty".into());
+    }
+
+    // Check for invalid characters that git doesn't allow
+    if input.contains("..")
+        || input.starts_with('/')
+        || input.ends_with('/')
+        || input.contains(' ')
+        || input.contains('~')
+        || input.contains('^')
+        || input.contains(':')
+        || input.contains('?')
+        || input.contains('*')
+        || input.contains('[')
+        || input.contains('\\')
+    {
+        return Validation::Invalid("Branch name contains invalid characters".into());
+    }
+
+    Validation::Valid
+}
+
+/// Wrapper for inquire validator that returns Result for compatibility
+///
+/// # Errors
+/// Returns an error if the input is somehow malformed or system validation fails
+pub fn validate_branch_name(input: &str) -> Result<Validation, Box<dyn Error + Send + Sync>> {
+    // Could potentially return error for system-level validation failures
+    if input.len() > 1000 {
+        return Err("Branch name is too long for system validation".into());
+    }
+    Ok(validate_branch_name_internal(input))
+}
+
+/// Handle the full interactive create workflow
+///
+/// # Errors
+/// Returns an error if:
+/// - Failed to get branch name input
+/// - Failed to open git repository
+/// - Interactive selection fails
+/// - Worktree creation fails
+pub fn interactive_create_workflow() -> Result<()> {
+    let provider = RealSelectionProvider;
+
+    // Step 1: Get branch name
+    let branch_name = provider.get_text_input(
+        "Enter the branch name for the new worktree:",
+        Some(validate_branch_name),
+    )?;
+
+    // Step 2: Get git reference for --from
+    let current_dir = std::env::current_dir()?;
+    let git_repo = GitRepo::open(&current_dir)?;
+
+    let selected_ref = select_git_reference_interactive(&git_repo, &provider)?;
+
+    // Step 3: Execute create with selected options
+    let mode = CreateMode::Smart; // Use smart mode as default
+    create_worktree(&branch_name, Some(&selected_ref), mode)?;
 
     Ok(())
 }
