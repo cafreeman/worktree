@@ -50,7 +50,7 @@ fn test_interactive_remove_selection() -> Result<()> {
     Ok(())
 }
 
-/// Test remove command with branch deletion
+/// Test remove command with branch deletion (default behavior)
 #[test]
 fn test_remove_with_branch_deletion() -> Result<()> {
     let env = CliTestEnvironment::new()?;
@@ -63,7 +63,7 @@ fn test_remove_with_branch_deletion() -> Result<()> {
     env.worktree_path("feature/delete-me")
         .assert(predicate::path::is_dir());
 
-    // Remove worktree and delete branch (default behavior)
+    // Remove worktree - should delete branch by default (force delete)
     env.run_command(&["remove", "feature/delete-me"])?
         .assert()
         .success();
@@ -94,7 +94,7 @@ fn test_remove_without_mapping_uses_head_resolution() -> Result<()> {
         std::fs::remove_file(mapping_file.path()).ok();
     }
 
-    // Remove worktree and delete branch (default)
+    // Remove worktree - should force delete branch by default
     env.run_command(&["remove", "feature/slashed/branch"])?
         .assert()
         .success();
@@ -104,9 +104,9 @@ fn test_remove_without_mapping_uses_head_resolution() -> Result<()> {
     Ok(())
 }
 
-/// Test unmanaged branch is not deleted unless forced
+/// Test that branches are force-deleted by default (previously required --force-delete-branch)
 #[test]
-fn test_unmanaged_branch_skip_and_force_delete() -> Result<()> {
+fn test_unmanaged_branch_force_deleted_by_default() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create an existing branch manually (unmanaged)
@@ -134,24 +134,11 @@ fn test_unmanaged_branch_skip_and_force_delete() -> Result<()> {
     let wt = env.worktree_path("feature/manual-branch");
     wt.assert(predicate::path::is_dir());
 
-    // Remove without force: should remove worktree; branch remains (we don't assert git state here)
+    // Remove - should force delete branch by default now (even if unmanaged)
     env.run_command(&["remove", "feature/manual-branch"])?
         .assert()
         .success();
     wt.assert(predicate::path::missing());
-
-    // Recreate worktree for same branch
-    env.run_command(&["create", "feature/manual-branch"])?
-        .assert()
-        .success();
-    let wt2 = env.worktree_path("feature/manual-branch");
-    wt2.assert(predicate::path::is_dir());
-
-    // Remove with force flag to delete unmanaged branch
-    env.run_command(&["remove", "feature/manual-branch", "--force-delete-branch"])?
-        .assert()
-        .success();
-    wt2.assert(predicate::path::missing());
 
     Ok(())
 }
@@ -186,30 +173,35 @@ fn test_remove_detached_head_skips_branch_deletion() -> Result<()> {
     Ok(())
 }
 
-/// Test remove command with keep branch flag
+/// Test remove command with --preserve-branch flag
 #[test]
-fn test_remove_keep_branch() -> Result<()> {
+fn test_remove_preserve_branch() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree
-    env.run_command(&["create", "feature/keep-branch"])?
+    env.run_command(&["create", "feature/preserve-me"])?
         .assert()
         .success();
 
-    env.worktree_path("feature/keep-branch")
+    env.worktree_path("feature/preserve-me")
         .assert(predicate::path::is_dir());
 
-    // Remove worktree but keep branch
-    env.run_command(&["remove", "feature/keep-branch", "--keep-branch"])?
+    // Remove worktree but preserve branch
+    env.run_command(&["remove", "feature/preserve-me", "--preserve-branch"])?
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains(
+            "Branch 'feature/preserve-me' preserved",
+        ));
 
     // Verify worktree is gone
-    env.worktree_path("feature/keep-branch")
+    env.worktree_path("feature/preserve-me")
         .assert(predicate::path::missing());
 
-    // Branch should still exist (we'd need to check git for this)
-    // For now, just verify the command succeeded
+    // Branch should still exist - we can recreate a worktree from it
+    env.run_command(&["create", "feature/preserve-me"])?
+        .assert()
+        .success();
 
     Ok(())
 }
@@ -293,7 +285,7 @@ fn test_remove_sanitized_name_branch_deletion() -> Result<()> {
     let worktree_path = env.worktree_path("feature/test-branch");
     worktree_path.assert(predicate::path::is_dir());
 
-    // Remove the worktree (this tests the branch name resolution fix)
+    // Remove the worktree - should force delete branch by default
     // The command should properly resolve the canonical branch name even
     // when the filesystem directory uses a sanitized name
     env.run_command(&["remove", "feature/test-branch"])?
