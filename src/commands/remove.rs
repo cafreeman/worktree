@@ -9,7 +9,7 @@ use crate::selection::{
 };
 use crate::storage::WorktreeStorage;
 
-/// Removes a worktree and optionally deletes the associated branch
+/// Removes a worktree and forcefully deletes the associated branch by default
 ///
 /// # Errors
 /// Returns an error if:
@@ -20,16 +20,14 @@ use crate::storage::WorktreeStorage;
 /// - Interactive selection fails
 pub fn remove_worktree(
     target: Option<&str>,
-    delete_branch: bool,
-    force_delete_branch: bool,
+    preserve_branch: bool,
     interactive: bool,
     list_completions: bool,
     current_repo_only: bool,
 ) -> Result<()> {
     remove_worktree_with_provider(
         target,
-        delete_branch,
-        force_delete_branch,
+        preserve_branch,
         interactive,
         list_completions,
         current_repo_only,
@@ -48,8 +46,7 @@ pub fn remove_worktree(
 /// - Interactive selection fails
 pub fn remove_worktree_with_provider(
     target: Option<&str>,
-    delete_branch: bool,
-    force_delete_branch: bool,
+    preserve_branch: bool,
     interactive: bool,
     list_completions: bool,
     current_repo_only: bool,
@@ -141,30 +138,23 @@ pub fn remove_worktree_with_provider(
         println!("⚠ Warning: Failed to clean up origin information: {}", e);
     }
 
-    if delete_branch {
-        // Only auto-delete branches managed by this CLI unless forced
-        let is_managed = storage.is_branch_managed(&repo_name, &resolved_branch_name);
-        if !is_managed && !force_delete_branch {
-            println!(
-                "⚠ Warning: Skipping branch deletion for unmanaged branch '{}'. Use --force-delete-branch to override.",
-                resolved_branch_name
-            );
-        } else {
-            println!("Deleting branch: {}", resolved_branch_name);
-            match git_repo.delete_branch(&resolved_branch_name) {
-                Ok(_) => {
-                    println!("✓ Branch deleted successfully");
-                    // Unmark managed status
-                    storage.unmark_branch_managed(&repo_name, &resolved_branch_name);
-                    // Remove mapping for this branch
-                    if let Err(e) = storage.remove_branch_mapping(&repo_name, &resolved_branch_name)
-                    {
-                        println!("⚠ Warning: Failed to remove branch mapping: {}", e);
-                    }
+    // By default, force delete the branch unless --preserve-branch is specified
+    if !preserve_branch {
+        println!("Deleting branch: {}", resolved_branch_name);
+        match git_repo.delete_branch(&resolved_branch_name) {
+            Ok(_) => {
+                println!("✓ Branch deleted successfully");
+                // Unmark managed status
+                storage.unmark_branch_managed(&repo_name, &resolved_branch_name);
+                // Remove mapping for this branch
+                if let Err(e) = storage.remove_branch_mapping(&repo_name, &resolved_branch_name) {
+                    println!("⚠ Warning: Failed to remove branch mapping: {}", e);
                 }
-                Err(e) => println!("⚠ Warning: Failed to delete branch: {}", e),
             }
+            Err(e) => println!("⚠ Warning: Failed to delete branch: {}", e),
         }
+    } else {
+        println!("Branch '{}' preserved (not deleted)", resolved_branch_name);
     }
 
     println!("✓ Worktree removed successfully!");

@@ -46,12 +46,9 @@ enum Commands {
         /// Branch name or path to remove. If not provided, opens interactive selection
         #[arg(value_hint = ValueHint::Other)]
         target: Option<String>,
-        /// Keep the branch (only remove the worktree)
+        /// Preserve the branch (only remove the worktree, don't delete the branch)
         #[arg(long)]
-        keep_branch: bool,
-        /// Force deletion of branch even if unmanaged
-        #[arg(long)]
-        force_delete_branch: bool,
+        preserve_branch: bool,
         /// Launch interactive selection mode
         #[arg(long)]
         interactive: bool,
@@ -174,16 +171,14 @@ fn main() -> Result<()> {
         }
         Commands::Remove {
             target,
-            keep_branch,
-            force_delete_branch,
+            preserve_branch,
             interactive,
             list_completions,
             current,
         } => {
             remove::remove_worktree(
                 target.as_deref(),
-                !keep_branch,
-                force_delete_branch,
+                preserve_branch,
                 interactive,
                 list_completions,
                 current,
