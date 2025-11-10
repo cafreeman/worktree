@@ -15,6 +15,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Create a new worktree
+    #[command(visible_alias = "c")]
     Create {
         /// Branch name for the worktree (if not provided, will prompt interactively)
         #[arg(value_hint = ValueHint::Other)]
@@ -36,12 +37,14 @@ enum Commands {
         list_from_completions: bool,
     },
     /// List all worktrees
+    #[command(visible_alias = "l")]
     List {
         /// Show worktrees for current repo only
         #[arg(long)]
         current: bool,
     },
     /// Remove a worktree
+    #[command(visible_alias = "rm")]
     Remove {
         /// Branch name or path to remove. If not provided, opens interactive selection
         #[arg(value_hint = ValueHint::Other)]
@@ -60,8 +63,10 @@ enum Commands {
         current: bool,
     },
     /// Show worktree status
+    #[command(visible_alias = "st")]
     Status,
     /// Sync config files between worktrees
+    #[command(visible_alias = "sync")]
     SyncConfig {
         /// Source branch or path
         #[arg(value_hint = ValueHint::Other)]
@@ -83,7 +88,7 @@ enum Commands {
         shell: Shell,
     },
     /// Jump to a worktree directory
-    #[command(visible_alias = "switch")]
+    #[command(visible_aliases = ["switch", "j"])]
     Jump {
         /// Target worktree (branch name). If not provided, opens interactive selection
         #[arg(value_hint = ValueHint::Other)]
@@ -99,8 +104,10 @@ enum Commands {
         current: bool,
     },
     /// Clean up orphaned branches and worktree references
+    #[command(visible_alias = "cl")]
     Cleanup,
     /// Navigate back to the original repository
+    #[command(visible_alias = "b")]
     Back,
 }
 

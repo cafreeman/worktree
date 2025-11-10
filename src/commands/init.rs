@@ -41,7 +41,7 @@ fn print_bash_integration() {
 
 worktree() {{
     case "$1" in
-        jump|switch)
+        jump|switch|j)
             # Handle jump/switch specially - call rust binary and cd to result
             local cmd="$1"
             shift
@@ -58,7 +58,7 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
-        back)
+        back|b)
             # Handle back specially - call rust binary and cd to result
             local result
             result=$(worktree-bin back)
@@ -66,7 +66,7 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
-        create)
+        create|c)
             # Handle create specially - support interactive workflow
             if [ $# -eq 1 ]; then
                 # No arguments provided - launch interactive workflow
@@ -101,7 +101,7 @@ _worktree_complete() {{
     local prev="${{COMP_WORDS[COMP_CWORD-1]}}"
 
     # Handle jump/switch subcommand specially
-    if [ "${{COMP_WORDS[1]}}" = "jump" ] || [ "${{COMP_WORDS[1]}}" = "switch" ]; then
+    if [ "${{COMP_WORDS[1]}}" = "jump" ] || [ "${{COMP_WORDS[1]}}" = "switch" ] || [ "${{COMP_WORDS[1]}}" = "j" ]; then
         # Trigger interactive mode on empty tab
         if [ "${{#COMP_WORDS[@]}}" -eq 3 ] && [ -z "$cur" ]; then
             worktree "${{COMP_WORDS[1]}}"
@@ -117,7 +117,7 @@ _worktree_complete() {{
             local worktrees=$(worktree-bin "${{COMP_WORDS[1]}}" --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
-    elif [ "${{COMP_WORDS[1]}}" = "remove" ]; then
+    elif [ "${{COMP_WORDS[1]}}" = "remove" ] || [ "${{COMP_WORDS[1]}}" = "rm" ]; then
         # Trigger interactive mode on empty tab
         if [ "${{#COMP_WORDS[@]}}" -eq 3 ] && [ -z "$cur" ]; then
             worktree remove --interactive
@@ -133,7 +133,7 @@ _worktree_complete() {{
             local worktrees=$(worktree-bin remove --list-completions 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
-    elif [ "${{COMP_WORDS[1]}}" = "create" ]; then
+    elif [ "${{COMP_WORDS[1]}}" = "create" ] || [ "${{COMP_WORDS[1]}}" = "c" ]; then
         # Handle create command specially for --from flag completion
         if [ "$prev" = "--from" ]; then
             # Get git references for completion
@@ -185,7 +185,13 @@ _worktree_complete() {{
     fi
 }}
 
-complete -F _worktree_complete worktree"#
+complete -F _worktree_complete worktree
+
+# Short alias: wt -> worktree
+wt() {{
+    worktree "$@"
+}}
+complete -F _worktree_complete wt"#
     );
 }
 
@@ -196,7 +202,7 @@ fn print_zsh_integration() {
 
 worktree() {{
     case "$1" in
-        jump|switch)
+        jump|switch|j)
             # Handle jump/switch specially - call rust binary and cd to result
             local cmd="$1"
             shift
@@ -213,7 +219,7 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
-        back)
+        back|b)
             # Handle back specially - call rust binary and cd to result
             local result
             result=$(worktree-bin back)
@@ -221,7 +227,7 @@ worktree() {{
                 cd "$result" || return 1
             fi
             ;;
-        create)
+        create|c)
             # Handle create specially - support interactive workflow
             if [ $# -eq 1 ]; then
                 # No arguments provided - launch interactive workflow
@@ -236,6 +242,11 @@ worktree() {{
             worktree-bin "$@"
             ;;
     esac
+}}
+
+# Short alias: wt -> worktree
+wt() {{
+    worktree "$@"
 }}
 
 # Load clap-generated completions
@@ -320,7 +331,7 @@ _worktree() {{
     typeset -A opt_args
 
     case "${{words[2]}}" in
-        jump|switch)
+        jump|switch|j)
             # Handle jump/switch subcommand specially
             if [[ ${{#words[@]}} -le 3 && "${{words[CURRENT]}}" != -* ]]; then
                 # Complete worktree names for jump/switch command
@@ -342,7 +353,7 @@ _worktree() {{
                 return 0
             fi
             ;;
-        remove)
+        remove|rm)
             # Handle remove subcommand specially
             if [[ ${{#words[@]}} -le 3 && "${{words[CURRENT]}}" != -* ]]; then
                 # Complete worktree names for remove command
@@ -365,7 +376,7 @@ _worktree() {{
                 return 0
             fi
             ;;
-        create)
+        create|c)
             # Handle create subcommand with standard argument completion
             _arguments -s : \
                 '--from=[Starting point for new branch]:FROM:_worktree_git_refs_fallback' \
@@ -415,6 +426,7 @@ _worktree() {{
 # Register the completion (only if compinit has been called)
 if (( $+functions[compdef] )); then
     compdef _worktree worktree
+    compdef _worktree wt
 fi"#
     );
 }
@@ -426,7 +438,7 @@ fn print_fish_integration() {
 
 function worktree
     switch $argv[1]
-        case jump switch
+        case jump switch j
             # Handle jump/switch specially - call rust binary and cd to result
             set cmd $argv[1]
             set -e argv[1]
@@ -442,13 +454,13 @@ function worktree
             if test -n "$result"
                 cd "$result"
             end
-        case back
+        case back b
             # Handle back specially - call rust binary and cd to result
             set result (worktree-bin back)
             if test -n "$result"
                 cd "$result"
             end
-        case create
+        case create c
             # Handle create specially - support interactive workflow
             if test (count $argv) -eq 1
                 # No arguments provided - launch interactive workflow
@@ -463,6 +475,11 @@ function worktree
     end
 end
 
+# Short alias: wt -> worktree
+function wt
+    worktree $argv
+end
+
 # Load clap-generated Fish completions
 if command -q worktree-bin
     eval (worktree-bin completions fish 2>/dev/null)
@@ -471,10 +488,19 @@ end
 # Override the jump, switch, and remove argument completions to add custom worktree names
 complete -c worktree -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
 complete -c worktree -n '__fish_seen_subcommand_from switch' -a '(worktree-bin switch --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c worktree -n '__fish_seen_subcommand_from j' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
 complete -c worktree -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c wt -n '__fish_seen_subcommand_from jump' -a '(worktree-bin jump --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c wt -n '__fish_seen_subcommand_from switch' -a '(worktree-bin switch --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c wt -n '__fish_seen_subcommand_from j' -a '(worktree-bin j --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c wt -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
+complete -c wt -n '__fish_seen_subcommand_from rm' -a '(worktree-bin rm --list-completions 2>/dev/null)' -d 'Available worktrees'
 
 # Override the --from flag completion for create command
 complete -c worktree -n '__fish_seen_subcommand_from create' -l from -a '(worktree-bin create dummy --list-from-completions 2>/dev/null)' -d 'Git references'
+complete -c worktree -n '__fish_seen_subcommand_from c' -l from -a '(worktree-bin create dummy --list-from-completions 2>/dev/null)' -d 'Git references'
+complete -c wt -n '__fish_seen_subcommand_from create' -l from -a '(worktree-bin create dummy --list-from-completions 2>/dev/null)' -d 'Git references'
+complete -c wt -n '__fish_seen_subcommand_from c' -l from -a '(worktree-bin c dummy --list-from-completions 2>/dev/null)' -d 'Git references'
 
 # The clap-generated completions handle all other subcommands and flags"#
     );
