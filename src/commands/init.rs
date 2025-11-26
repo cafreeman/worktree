@@ -100,6 +100,16 @@ _worktree_complete() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     local prev="${{COMP_WORDS[COMP_CWORD-1]}}"
 
+    # If we're completing the subcommand (COMP_CWORD == 1), delegate to clap
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        # Delegate to clap for subcommand completion
+        local saved_comp_words=("${{COMP_WORDS[@]}}")
+        COMP_WORDS[0]="worktree-bin"
+        _worktree_clap "worktree-bin" "$cur" "$prev"
+        COMP_WORDS=("${{saved_comp_words[@]}}")
+        return 0
+    fi
+
     # Handle jump/switch subcommand specially
     if [ "${{COMP_WORDS[1]}}" = "jump" ] || [ "${{COMP_WORDS[1]}}" = "switch" ]; then
         # Trigger interactive mode on empty tab
@@ -134,10 +144,10 @@ _worktree_complete() {{
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
         fi
     elif [ "${{COMP_WORDS[1]}}" = "create" ]; then
-        # Handle create command specially for --from flag completion
+        # Handle create command specially
         if [ "$prev" = "--from" ]; then
-            # Get git references for completion
-            local git_refs=$(worktree-bin create dummy --list-from-completions 2>/dev/null)
+            # Get git references for --from flag completion
+            local git_refs=$(worktree-bin create --list-from-completions 2>/dev/null)
 
             # Check if we got any references
             if [[ -z "$git_refs" ]]; then
@@ -166,22 +176,51 @@ _worktree_complete() {{
             else
                 COMPREPLY=($(printf '%s\n' $git_refs | head -20))
             fi
-        elif [[ "$cur" == -* ]] || [ "${{#COMP_WORDS[@]}}" -eq 2 ]; then
-            # Complete flags for create command (when typing flags or at the beginning)
+        elif [[ "$cur" == -* ]]; then
+            # Complete flags for create command
             COMPREPLY=($(compgen -W "--from --new-branch --existing-branch --interactive-from --help" -- "$cur"))
+        else
+            # Complete branch name argument (the first positional argument)
+            # Check if we're completing the branch name (no branch argument provided yet)
+            local has_branch_arg=false
+            for ((i=2; i<${{#COMP_WORDS[@]}}-1; i++)); do
+                if [[ "${{COMP_WORDS[i]}}" != -* ]] && [[ "${{COMP_WORDS[i-1]}}" != "--from" ]]; then
+                    has_branch_arg=true
+                    break
+                fi
+            done
+
+            if [ "$has_branch_arg" = false ]; then
+                # Complete branch names from git references
+                local git_refs=$(worktree-bin create --list-from-completions 2>/dev/null)
+                if [[ -n "$git_refs" ]]; then
+                    local IFS=$'\n'
+                    local filtered_refs=()
+
+                    if [[ -n "$cur" ]]; then
+                        while IFS= read -r ref; do
+                            if [[ -n "$ref" && "${{ref,,}}" == *"${{cur,,}}"* ]]; then
+                                filtered_refs+=("$ref")
+                            fi
+                        done <<< "$git_refs"
+
+                        if [[ ${{#filtered_refs[@]}} -gt 0 ]]; then
+                            COMPREPLY=($(printf '%s\n' "${{filtered_refs[@]}}" | head -20))
+                        else
+                            COMPREPLY=($(printf '%s\n' $git_refs | head -20))
+                        fi
+                    else
+                        COMPREPLY=($(printf '%s\n' $git_refs | head -20))
+                    fi
+                fi
+            fi
         fi
     else
-        # For all other commands, delegate to clap completion if available
-        if [ "$_worktree_clap_available" = "true" ] && declare -F _worktree_clap >/dev/null 2>&1; then
-            # Temporarily modify COMP_WORDS to make it look like worktree-bin
-            local saved_comp_words=("${{COMP_WORDS[@]}}")
-            COMP_WORDS[0]="worktree-bin"
-            _worktree_clap
-            COMP_WORDS=("${{saved_comp_words[@]}}")
-        else
-            # Fallback to basic completion
-            COMPREPLY=($(compgen -W "create list remove status sync-config jump switch back init completions cleanup --help --version" -- "$cur"))
-        fi
+        # For all other commands, delegate to clap completion
+        local saved_comp_words=("${{COMP_WORDS[@]}}")
+        COMP_WORDS[0]="worktree-bin"
+        _worktree_clap "worktree-bin" "$cur" "$prev"
+        COMP_WORDS=("${{saved_comp_words[@]}}")
     fi
 }}
 
@@ -262,7 +301,7 @@ fi
 # Helper function for git reference completion
 _worktree_git_refs() {{
     local -a all_refs local_branches remote_branches tags
-    all_refs=($(worktree-bin create dummy --list-from-completions 2>/dev/null))
+    all_refs=($(worktree-bin create --list-from-completions 2>/dev/null))
 
     if [[ ${{#all_refs[@]}} -gt 0 ]]; then
         # Separate references by type
@@ -305,7 +344,7 @@ _worktree_git_refs() {{
 # Fallback function for when user types partial reference name
 _worktree_git_refs_fallback() {{
     local -a all_refs
-    all_refs=($(worktree-bin create dummy --list-from-completions 2>/dev/null))
+    all_refs=($(worktree-bin create --list-from-completions 2>/dev/null))
 
     if [[ ${{#all_refs[@]}} -gt 0 ]]; then
         _describe 'git references' all_refs
@@ -318,6 +357,17 @@ _worktree_git_refs_fallback() {{
 _worktree() {{
     local line state context curcontext="$curcontext"
     typeset -A opt_args
+
+    # If we're completing the subcommand (only 'worktree' has been typed), delegate to clap
+    if [[ ${{#words[@]}} -eq 2 || -z "${{words[2]}}" ]]; then
+        # Delegate to clap for subcommand completion
+        local original_words=("${{words[@]}}")
+        words[1]="worktree-bin"
+        _worktree_clap "$@"
+        local result=$?
+        words=("${{original_words[@]}}")
+        return $result
+    fi
 
     case "${{words[2]}}" in
         jump|switch)
@@ -374,40 +424,17 @@ _worktree() {{
                 '--interactive-from[Launch interactive selection for --from reference]' \
                 '--help[Print help]' \
                 '-h[Print help]' \
-                ':branch -- Branch name for the worktree:'
+                ':branch -- Branch name for the worktree:_worktree_git_refs_fallback'
             return 0
             ;;
         *)
-            # For all other commands, delegate to clap completions if available
-            if [[ "$_worktree_clap_available" = "true" ]]; then
-                # Modify the first word to be worktree-bin for delegation
-                local original_words=("${{words[@]}}")
-                words[1]="worktree-bin"
-                _worktree_clap "$@"
-                local result=$?
-                words=("${{original_words[@]}}")
-                return $result
-            else
-                # Fallback: basic subcommand completion
-                if [[ ${{#words[@]}} -eq 2 ]]; then
-                    local -a subcommands
-                    subcommands=(
-                        'create:Create a new worktree'
-                        'list:List all worktrees'
-                        'remove:Remove a worktree'
-                        'status:Show worktree status'
-                        'sync-config:Sync config files between worktrees'
-                        'jump:Jump to a worktree directory'
-                        'switch:Switch to a worktree directory (alias for jump)'
-                        'back:Navigate back to the original repository'
-                        'init:Generate shell integration'
-                        'completions:Generate shell completions'
-                        'cleanup:Clean up orphaned branches and worktree references'
-                    )
-                    _describe 'worktree commands' subcommands
-                    return 0
-                fi
-            fi
+            # For all other commands, delegate to clap completions
+            local original_words=("${{words[@]}}")
+            words[1]="worktree-bin"
+            _worktree_clap "$@"
+            local result=$?
+            words=("${{original_words[@]}}")
+            return $result
             ;;
     esac
 }}
@@ -474,7 +501,11 @@ complete -c worktree -n '__fish_seen_subcommand_from switch' -a '(worktree-bin s
 complete -c worktree -n '__fish_seen_subcommand_from remove' -a '(worktree-bin remove --list-completions 2>/dev/null)' -d 'Available worktrees'
 
 # Override the --from flag completion for create command
-complete -c worktree -n '__fish_seen_subcommand_from create' -l from -a '(worktree-bin create dummy --list-from-completions 2>/dev/null)' -d 'Git references'
+complete -c worktree -n '__fish_seen_subcommand_from create' -l from -a '(worktree-bin create --list-from-completions 2>/dev/null)' -d 'Git references'
+
+# Add branch name completion for create command (positional argument)
+# This completes the branch name when user types: worktree create <TAB>
+complete -c worktree -n '__fish_seen_subcommand_from create; and not __fish_seen_subcommand_from (worktree-bin create --list-from-completions 2>/dev/null)' -a '(worktree-bin create --list-from-completions 2>/dev/null)' -d 'Branch name'
 
 # The clap-generated completions handle all other subcommands and flags"#
     );
