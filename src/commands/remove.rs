@@ -3,10 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::git::GitRepo;
-use crate::selection::{
-    RealSelectionProvider, SelectionProvider, extract_branch_from_selection,
-    extract_path_from_selection,
-};
+use crate::selection::{RealSelectionProvider, SelectionProvider};
 use crate::storage::WorktreeStorage;
 
 /// Removes a worktree and forcefully deletes the associated branch by default
@@ -294,13 +291,17 @@ fn select_worktree_for_removal(
         .map(|(repo, branch, path)| format!("{}/{} ({})", repo, branch, path.display()))
         .collect();
 
-    let selection = provider.select("Select worktree to remove:", options)?;
+    let selection = provider.select("Select worktree to remove:", options.clone())?;
 
-    // Extract path and branch from selection using helper functions
-    let path = extract_path_from_selection(&selection)?;
-    let branch = extract_branch_from_selection(&selection)?;
+    // Find the index of the selected option and use it to look up path and branch directly,
+    // avoiding any string parsing that would break on paths containing " (".
+    let index = options
+        .iter()
+        .position(|o| o == &selection)
+        .ok_or_else(|| anyhow::anyhow!("Selected option not found in list"))?;
 
-    Ok((path, branch))
+    let (_, branch, path) = &worktrees[index];
+    Ok((path.clone(), branch.clone()))
 }
 
 fn get_available_worktrees(

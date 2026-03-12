@@ -141,6 +141,30 @@ impl GitRepo {
             .collect())
     }
 
+    /// Lists all worktrees with their paths and prunable status
+    ///
+    /// Returns a vector of `(name, path, is_prunable)` tuples.
+    /// Worktrees whose path no longer exists on disk are prunable.
+    ///
+    /// # Errors
+    /// Returns an error if git operations fail
+    pub fn list_worktrees_with_paths(&self) -> Result<Vec<(String, std::path::PathBuf, bool)>> {
+        let worktree_names = self.repo.worktrees()?;
+        let mut result = Vec::new();
+
+        for name in worktree_names.iter().flatten() {
+            if let Ok(wt) = self.repo.find_worktree(name) {
+                let path = wt.path().to_path_buf();
+                let is_prunable = wt
+                    .is_prunable(None)
+                    .unwrap_or(false);
+                result.push((name.to_string(), path, is_prunable));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Deletes a branch from the repository
     ///
     /// # Errors
@@ -375,11 +399,6 @@ fn should_inherit_config_key(key: &str) -> bool {
 }
 
 impl GitOperations for GitRepo {
-    fn open(path: &Path) -> Result<Box<dyn GitOperations>> {
-        let git_repo = GitRepo::open(path)?;
-        Ok(Box::new(git_repo))
-    }
-
     fn get_repo_path(&self) -> PathBuf {
         self.get_repo_path().to_path_buf()
     }

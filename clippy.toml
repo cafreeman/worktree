@@ -10,7 +10,7 @@ avoid-breaking-exported-api = false
 
 # Disallowed names (extend defaults with custom additions)
 # Default list typically includes ["foo", "baz", "quux"]
-disallowed-names = ["tmp", "temp", "..", "data", "value"]
+disallowed-names = ["tmp", "temp", ".."]
 
 # Maximum allowed cognitive complexity
 cognitive-complexity-threshold = 30

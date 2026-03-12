@@ -111,45 +111,23 @@ pub fn cleanup_worktrees() -> Result<()> {
     }
 
     // Clean up any git worktree references that point to non-existent directories
-    // This is handled by checking git worktree list and removing orphaned entries
-    match std::process::Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(&current_dir)
-        .output()
-    {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            let mut current_worktree_path = None;
-            let mut orphaned_worktrees = Vec::new();
-
-            for line in output_str.lines() {
-                if let Some(path) = line.strip_prefix("worktree ") {
-                    current_worktree_path = Some(path.to_string());
-                } else if line.starts_with("branch ") {
-                    if let Some(path) = current_worktree_path.take() {
-                        if !std::path::Path::new(&path).exists()
-                            && !path.ends_with(&current_dir.to_string_lossy().to_string())
-                        {
-                            orphaned_worktrees.push(path);
-                        }
-                    }
+    // Use git2 API to list worktrees and find orphaned references
+    match git_repo.list_worktrees_with_paths() {
+        Ok(worktrees) => {
+            for (name, path, is_prunable) in worktrees {
+                // Skip the current working directory (main worktree check)
+                if path == current_dir {
+                    continue;
                 }
-            }
 
-            for orphaned_path in orphaned_worktrees {
-                println!(
-                    "🗑️  Found orphaned git worktree reference: {}",
-                    orphaned_path
-                );
-                if let Some(worktree_name) = std::path::Path::new(&orphaned_path).file_name() {
-                    if let Some(name_str) = worktree_name.to_str() {
-                        match git_repo.remove_worktree(name_str) {
-                            Ok(_) => println!("   ✓ Removed git worktree reference: {}", name_str),
-                            Err(e) => println!(
-                                "   ⚠ Warning: Could not remove git worktree reference {}: {}",
-                                name_str, e
-                            ),
-                        }
+                if is_prunable || !path.exists() {
+                    println!("🗑️  Found orphaned git worktree reference: {}", path.display());
+                    match git_repo.remove_worktree(&name) {
+                        Ok(_) => println!("   ✓ Removed git worktree reference: {}", name),
+                        Err(e) => println!(
+                            "   ⚠ Warning: Could not remove git worktree reference {}: {}",
+                            name, e
+                        ),
                     }
                 }
             }
@@ -163,11 +141,27 @@ pub fn cleanup_worktrees() -> Result<()> {
     // Iterate managed worktrees stored under repo storage and check for branch existence
     if let Ok(repo_worktrees) = storage.list_repo_worktrees(&repo_name) {
         for sanitized in repo_worktrees {
-            // Get the original branch name for accurate git checks
-            let original_branch = storage
-                .get_original_branch_name(&repo_name, &sanitized)
-                .unwrap_or(Some(sanitized.clone()))
-                .unwrap_or(sanitized.clone());
+            // Get the original branch name for accurate git checks.
+            // If the mapping is missing or corrupted, skip this entry rather than
+            // using the sanitized name (which would never match git branch names
+            // like "feature/auth" stored as "feature-auth") and cause false orphan detection.
+            let original_branch = match storage.get_original_branch_name(&repo_name, &sanitized) {
+                Ok(Some(name)) => name,
+                Ok(None) => {
+                    eprintln!(
+                        "Warning: Could not determine original branch name for worktree directory '{}', skipping",
+                        sanitized
+                    );
+                    continue;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Could not determine original branch name for worktree directory '{}', skipping: {}",
+                        sanitized, e
+                    );
+                    continue;
+                }
+            };
 
             if !branches.contains(&original_branch) {
                 // Branch no longer exists in git; remove directory and clean metadata

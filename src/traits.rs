@@ -3,13 +3,6 @@ use std::path::{Path, PathBuf};
 
 /// Trait for Git operations to enable mocking in tests
 pub trait GitOperations {
-    /// Opens a git repository at the specified path
-    ///
-    /// # Errors
-    /// Returns an error if the path is not a valid git repository
-    fn open(path: &Path) -> Result<Box<dyn GitOperations>>
-    where
-        Self: Sized;
     fn get_repo_path(&self) -> PathBuf;
     /// Checks if a branch exists in the repository
     ///

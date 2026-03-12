@@ -460,7 +460,7 @@ fn test_create_worktree_interactive_from_selection() -> Result<()> {
         .current_dir(env.repo_dir.path())
         .output()?;
 
-    // Create a remote and remote branch
+    // Add a remote so remote-tracking branches can be resolved
     std::process::Command::new("git")
         .args([
             "remote",
@@ -468,11 +468,6 @@ fn test_create_worktree_interactive_from_selection() -> Result<()> {
             "origin",
             "https://github.com/test/repo.git",
         ])
-        .current_dir(env.repo_dir.path())
-        .output()?;
-
-    std::process::Command::new("git")
-        .args(["branch", "origin/test-remote-branch"])
         .current_dir(env.repo_dir.path())
         .output()?;
 
@@ -684,6 +679,27 @@ fn test_branch_name_validation() {
         validate_branch_name_internal("feature\\"),
         Validation::Invalid(_)
     ));
+}
+
+/// Test that creating a worktree for 'feature-auth' fails when 'feature/auth' already exists,
+/// because both sanitize to the same filesystem path 'feature-auth'.
+#[test]
+fn test_branch_name_collision_rejected() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Step 1: Create a worktree for feature/auth (sanitizes to feature-auth)
+    env.run_command(&["create", "feature/auth"])?
+        .assert()
+        .success();
+
+    // Step 2: Attempt to create feature-auth (already the sanitized form of feature/auth)
+    // This must fail because the worktree path already exists
+    env.run_command(&["create", "feature-auth"])?
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+
+    Ok(())
 }
 
 #[cfg(test)]

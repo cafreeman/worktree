@@ -170,12 +170,12 @@ pub fn copy_config_files(
 ) -> Result<()> {
     println!("Copying configuration files...");
 
-    for pattern in config.copy_patterns.include.as_ref().unwrap_or(&vec![]) {
+    for pattern in config.copy_patterns.include.as_deref().unwrap_or_default() {
         if let Some(matches) = find_matching_files(source_path, pattern)? {
             for source_file in matches {
                 if should_exclude_file(
                     &source_file,
-                    config.copy_patterns.exclude.as_ref().unwrap_or(&vec![]),
+                    config.copy_patterns.exclude.as_deref().unwrap_or_default(),
                 )? {
                     continue;
                 }
@@ -373,6 +373,14 @@ pub fn validate_branch_name_internal(input: &str) -> Validation {
         || input.contains('\\')
     {
         return Validation::Invalid("Branch name contains invalid characters".into());
+    }
+
+    if input.ends_with(".lock") {
+        return Validation::Invalid("Branch name cannot end with '.lock'".into());
+    }
+
+    if input.ends_with('.') {
+        return Validation::Invalid("Branch name cannot end with '.'".into());
     }
 
     Validation::Valid

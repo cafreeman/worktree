@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 use crate::git::GitRepo;
-use crate::selection::{RealSelectionProvider, SelectionProvider, extract_path_from_selection};
+use crate::selection::{RealSelectionProvider, SelectionProvider};
 use crate::storage::WorktreeStorage;
 
 /// Jump to a worktree directory
@@ -92,10 +92,16 @@ fn select_worktree_interactive(
         .map(|(repo, branch, path)| format!("{}/{} ({})", repo, branch, path.display()))
         .collect();
 
-    let selection = provider.select("Jump to worktree:", options)?;
+    let selection = provider.select("Jump to worktree:", options.clone())?;
 
-    // Extract path from selection using helper function
-    extract_path_from_selection(&selection)
+    // Find the index of the selected option and use it to look up the path directly,
+    // avoiding any string parsing that would break on paths containing " (".
+    let index = options
+        .iter()
+        .position(|o| o == &selection)
+        .ok_or_else(|| anyhow::anyhow!("Selected option not found in list"))?;
+
+    Ok(worktrees[index].2.clone())
 }
 
 fn find_worktree_by_name(
