@@ -16,18 +16,15 @@ pub struct Cli {
 enum Commands {
     /// Create a new worktree
     Create {
-        /// Branch name for the worktree (if not provided, will prompt interactively)
+        /// Feature name for the worktree (used as directory name). If not provided, will prompt interactively.
+        #[arg(value_hint = ValueHint::Other)]
+        feature_name: Option<String>,
+        /// Starting branch for the worktree (create new or use existing). If not provided, will prompt.
         #[arg(value_hint = ValueHint::Other)]
         branch: Option<String>,
         /// Starting point for new branch (branch, commit, tag)
         #[arg(long)]
         from: Option<String>,
-        /// Force creation of a new branch (fail if it already exists)
-        #[arg(long, conflicts_with = "existing_branch")]
-        new_branch: bool,
-        /// Only use an existing branch (fail if it doesn't exist)
-        #[arg(long, conflicts_with = "new_branch")]
-        existing_branch: bool,
         /// Launch interactive selection for --from reference
         #[arg(long)]
         interactive_from: bool,
@@ -43,12 +40,12 @@ enum Commands {
     },
     /// Remove a worktree
     Remove {
-        /// Branch name or path to remove. If not provided, opens interactive selection
+        /// Feature name or path to remove. If not provided, opens interactive selection.
         #[arg(value_hint = ValueHint::Other)]
         target: Option<String>,
-        /// Preserve the branch (only remove the worktree, don't delete the branch)
+        /// Also delete the branch checked out in this worktree
         #[arg(long)]
-        preserve_branch: bool,
+        delete_branch: bool,
         /// Launch interactive selection mode
         #[arg(long)]
         interactive: bool,
@@ -85,7 +82,7 @@ enum Commands {
     /// Jump to a worktree directory
     #[command(visible_alias = "switch")]
     Jump {
-        /// Target worktree (branch name). If not provided, opens interactive selection
+        /// Target worktree (feature name). If not provided, opens interactive selection.
         #[arg(value_hint = ValueHint::Other)]
         target: Option<String>,
         /// Launch interactive selection mode
@@ -109,10 +106,9 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Create {
+            feature_name,
             branch,
             from,
-            new_branch,
-            existing_branch,
             interactive_from,
             list_from_completions,
         } => {
@@ -121,48 +117,44 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            // Handle different execution modes
-            match (branch, from, interactive_from) {
-                // No branch provided - launch full interactive workflow
-                (None, None, false) => {
+            match (feature_name, branch, from, interactive_from) {
+                // No args — full interactive workflow
+                (None, None, None, false) => {
                     create::interactive_create_workflow()?;
                 }
-                // Branch provided but wants interactive --from selection
-                (Some(branch_name), None, true) => {
-                    create::interactive_from_selection(&branch_name)?;
+                // Feature name provided, wants interactive --from selection
+                (Some(feat), branch_arg, None, true) => {
+                    create::interactive_from_selection(&feat, branch_arg.as_deref())?;
                 }
-                // Traditional command-line usage
-                (Some(branch_name), from_ref, false) => {
-                    let mode = if new_branch {
-                        create::CreateMode::NewBranch
-                    } else if existing_branch {
-                        create::CreateMode::ExistingBranch
-                    } else {
-                        create::CreateMode::Smart
-                    };
-                    create::create_worktree(&branch_name, from_ref.as_deref(), mode)?;
+                // Feature name provided, no branch — prompt for branch interactively
+                (Some(feat), None, _from_ref, false) => {
+                    create::interactive_create_with_feature(&feat)?;
                 }
-                // Invalid combinations
-                (None, Some(_), _) => {
+                // Both feature name and branch provided
+                (Some(feat), Some(branch_arg), from_ref, false) => {
+                    create::create_worktree(&feat, Some(&branch_arg), from_ref.as_deref())?;
+                }
+                // Invalid: --from without feature name
+                (None, _, Some(_), _) => {
                     anyhow::bail!(
-                        "Cannot specify --from without a branch name. Use interactive mode instead."
+                        "Cannot specify --from without a feature name. Use interactive mode instead."
                     );
                 }
-                (None, None, true) => {
+                // Invalid: --interactive-from without feature name
+                (None, _, _, true) => {
                     anyhow::bail!(
-                        "--interactive-from requires a branch name. Use interactive mode instead."
+                        "--interactive-from requires a feature name. Use interactive mode instead."
                     );
                 }
-                // Branch provided with from_ref AND interactive_from - use the from_ref
-                (Some(branch_name), Some(from_ref), true) => {
-                    let mode = if new_branch {
-                        create::CreateMode::NewBranch
-                    } else if existing_branch {
-                        create::CreateMode::ExistingBranch
-                    } else {
-                        create::CreateMode::Smart
-                    };
-                    create::create_worktree(&branch_name, Some(&from_ref), mode)?;
+                // Feature + branch + from + interactive_from: use from ref
+                (Some(feat), Some(branch_arg), Some(from_ref), true) => {
+                    create::create_worktree(&feat, Some(&branch_arg), Some(&from_ref))?;
+                }
+                // Catch-all: invalid combinations
+                _ => {
+                    anyhow::bail!(
+                        "Invalid argument combination. Run 'worktree create --help' for usage."
+                    );
                 }
             }
         }
@@ -171,14 +163,14 @@ fn main() -> Result<()> {
         }
         Commands::Remove {
             target,
-            preserve_branch,
+            delete_branch,
             interactive,
             list_completions,
             current,
         } => {
             remove::remove_worktree(
                 target.as_deref(),
-                preserve_branch,
+                delete_branch,
                 interactive,
                 list_completions,
                 current,

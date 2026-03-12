@@ -127,7 +127,7 @@ _worktree_complete() {{
         # Complete remove command
         if [[ "$cur" == -* ]]; then
             # Complete flags for remove
-            COMPREPLY=($(compgen -W "--interactive --current --keep-branch --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--interactive --current --delete-branch --help" -- "$cur"))
         else
             # Complete worktree names
             local worktrees=$(worktree-bin remove --list-completions 2>/dev/null)
@@ -168,7 +168,7 @@ _worktree_complete() {{
             fi
         elif [[ "$cur" == -* ]] || [ "${{#COMP_WORDS[@]}}" -eq 2 ]; then
             # Complete flags for create command (when typing flags or at the beginning)
-            COMPREPLY=($(compgen -W "--from --new-branch --existing-branch --interactive-from --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--from --interactive-from --help" -- "$cur"))
         fi
     else
         # For all other commands, delegate to clap completion if available
@@ -359,7 +359,7 @@ _worktree() {{
                 _arguments -s : \
                     '--interactive[Launch interactive selection mode]' \
                     '--current[Current repo only]' \
-                    '--keep-branch[Keep the branch (only remove the worktree)]' \
+                    '--delete-branch[Also delete the branch checked out in this worktree]' \
                     '--help[Print help]' \
                     '-h[Print help]'
                 return 0
@@ -369,12 +369,11 @@ _worktree() {{
             # Handle create subcommand with standard argument completion
             _arguments -s : \
                 '--from=[Starting point for new branch]:FROM:_worktree_git_refs_fallback' \
-                '--new-branch[Force creation of a new branch]' \
-                '--existing-branch[Only use an existing branch]' \
                 '--interactive-from[Launch interactive selection for --from reference]' \
                 '--help[Print help]' \
                 '-h[Print help]' \
-                ':branch -- Branch name for the worktree:'
+                ':feature-name -- Feature name for the worktree (used as directory name):' \
+                ':branch -- Starting branch name:'
             return 0
             ;;
         *)

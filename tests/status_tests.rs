@@ -29,10 +29,13 @@ fn test_status_empty() -> Result<()> {
 fn test_status_with_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create several worktrees
-    let branches = ["feature/status-test", "bugfix/status"];
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    // Create several worktrees using feature-name + branch pairs
+    let worktrees = [
+        ("status-test", "feature/status-test"),
+        ("status-fix", "bugfix/status"),
+    ];
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Status should succeed with worktrees
@@ -67,8 +70,8 @@ fn test_status_help() -> Result<()> {
 fn test_status_basic() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create a worktree
-    env.run_command(&["create", "feature/basic-status"])?
+    // Create a worktree using feature-name + branch
+    env.run_command(&["create", "basic-status", "feature/basic-status"])?
         .assert()
         .success();
 

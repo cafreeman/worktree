@@ -1,15 +1,12 @@
 use anyhow::Result;
 
 use crate::git::GitRepo;
-use crate::storage::WorktreeStorage;
+use crate::storage::{WorktreeStorage, read_worktree_head_branch};
 
 /// Lists all worktrees, optionally filtered to current repository only
 ///
 /// # Errors
-/// Returns an error if:
-/// - Failed to access the storage system
-/// - Failed to determine current repository
-/// - Git operations fail
+/// Returns an error if storage access or git operations fail.
 pub fn list_worktrees(current_repo_only: bool) -> Result<()> {
     let storage = WorktreeStorage::new()?;
 
@@ -38,23 +35,27 @@ fn list_current_repo_worktrees(storage: &WorktreeStorage) -> Result<()> {
         return Ok(());
     }
 
-    for worktree in worktrees {
-        let worktree_path = storage.get_worktree_path(&repo_name, &worktree);
+    for feature_name in worktrees {
+        let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
         let status = if worktree_path.exists() {
             "✓ Active"
         } else {
             "✗ Missing"
         };
 
-        // Try to get original branch name, fallback to sanitized name
-        let display_name = storage
-            .get_original_branch_name(&repo_name, &worktree)?
-            .unwrap_or_else(|| worktree.clone());
+        let branch_info = if worktree_path.exists() {
+            read_worktree_head_branch(&worktree_path)
+                .map(|b| format!(" ({})", b))
+                .unwrap_or_else(|| " (detached)".to_string())
+        } else {
+            String::new()
+        };
 
         println!(
-            "  {} {} ({})",
+            "  {} {}{}  {}",
             status,
-            display_name,
+            feature_name,
+            branch_info,
             worktree_path.display()
         );
     }
@@ -79,19 +80,23 @@ fn list_all_worktrees(storage: &WorktreeStorage) -> Result<()> {
         }
 
         println!("\n📁 {}", repo_name);
-        for worktree in worktrees {
-            let worktree_path = storage.get_worktree_path(&repo_name, &worktree);
+        for feature_name in worktrees {
+            let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
             let status = if worktree_path.exists() { "✓" } else { "✗" };
 
-            // Try to get original branch name, fallback to sanitized name
-            let display_name = storage
-                .get_original_branch_name(&repo_name, &worktree)?
-                .unwrap_or_else(|| worktree.clone());
+            let branch_info = if worktree_path.exists() {
+                read_worktree_head_branch(&worktree_path)
+                    .map(|b| format!(" ({})", b))
+                    .unwrap_or_else(|| " (detached)".to_string())
+            } else {
+                String::new()
+            };
 
             println!(
-                "  {} {} ({})",
+                "  {} {}{}  {}",
                 status,
-                display_name,
+                feature_name,
+                branch_info,
                 worktree_path.display()
             );
         }

@@ -316,8 +316,8 @@ include = ["mise.toml"]
         .child("package")
         .write_str("should be excluded")?;
 
-    // Create worktree
-    env.run_command(&["create", "test-branch"])?
+    // Create worktree using feature-name + branch
+    env.run_command(&["create", "test-branch", "feature/test-branch"])?
         .assert()
         .success();
 
@@ -352,9 +352,9 @@ exclude = [".vscode/"]
 "#,
     )?;
 
-    // Create worktrees
-    env.run_command(&["create", "source"])?.assert().success();
-    env.run_command(&["create", "target"])?.assert().success();
+    // Create worktrees using feature-name + branch pairs
+    env.run_command(&["create", "source", "feature/source"])?.assert().success();
+    env.run_command(&["create", "target", "feature/target"])?.assert().success();
 
     let source_path = env.worktree_path("source");
     let target_path = env.worktree_path("target");
@@ -496,6 +496,63 @@ exclude = ["*.secret"]
     // Should also have default excludes merged in
     assert!(excludes.contains(&"node_modules/".to_string()));
     assert!(excludes.contains(&"target/".to_string()));
+
+    Ok(())
+}
+
+/// Test that new symlink-patterns and on-create sections are parsed correctly
+#[test]
+fn test_symlink_patterns_section_parsed() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.repo_dir.child(".worktree-config.toml").write_str(
+        r#"
+[copy-patterns]
+include = [".env*"]
+
+[symlink-patterns]
+include = ["secrets.env", "certs/"]
+
+[on-create]
+commands = ["npm install", "cargo build"]
+"#,
+    )?;
+
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
+
+    // Symlink patterns should be parsed
+    let symlinks = config.symlink_patterns.include.as_ref().unwrap();
+    assert!(symlinks.contains(&"secrets.env".to_string()));
+    assert!(symlinks.contains(&"certs/".to_string()));
+
+    // On-create commands should be parsed
+    let commands = config.on_create.commands.as_ref().unwrap();
+    assert!(commands.contains(&"npm install".to_string()));
+    assert!(commands.contains(&"cargo build".to_string()));
+
+    Ok(())
+}
+
+/// Test that missing symlink-patterns and on-create sections default to empty
+#[test]
+fn test_missing_symlink_and_on_create_sections_default_empty() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Config with only copy-patterns
+    env.repo_dir.child(".worktree-config.toml").write_str(
+        r#"
+[copy-patterns]
+include = [".env*"]
+"#,
+    )?;
+
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
+
+    // Symlink patterns should be None (empty default)
+    assert!(config.symlink_patterns.include.is_none());
+
+    // On-create commands should be None (empty default)
+    assert!(config.on_create.commands.is_none());
 
     Ok(())
 }

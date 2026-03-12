@@ -20,36 +20,36 @@ fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
 fn test_jump_completion_output_format() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create multiple worktrees with different naming patterns
-    let branches = [
-        "feature/user-auth",
-        "bugfix/login-issue",
-        "release/v1.2.0",
-        "hotfix/critical-bug",
-        "feature/api-v2",
+    // Create multiple worktrees with feature names and different branch names
+    let worktrees = [
+        ("user-auth", "feature/user-auth"),
+        ("login-fix", "bugfix/login-issue"),
+        ("release-v1-2", "release/v1.2.0"),
+        ("critical-bug", "hotfix/critical-bug"),
+        ("api-v2", "feature/api-v2"),
     ];
 
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Test completion output
     let output = get_stdout(&env, &["jump", "--list-completions"])?;
 
-    // Verify format: one branch per line, no extra formatting
+    // Verify format: one feature name per line, no extra formatting
     let lines: Vec<&str> = output.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
-        branches.len(),
+        worktrees.len(),
         "Should output one line per worktree"
     );
 
-    // Verify each branch appears exactly once
-    for branch in &branches {
+    // Verify each feature name appears exactly once
+    for (feature, _) in &worktrees {
         assert!(
-            lines.contains(branch),
-            "Completion should include branch: {}",
-            branch
+            lines.contains(feature),
+            "Completion should include feature: {}",
+            feature
         );
     }
 
@@ -65,12 +65,6 @@ fn test_jump_completion_output_format() -> Result<()> {
             "Completion lines should not contain path descriptions: {}",
             line
         );
-        assert!(
-            line.chars()
-                .all(|c| c.is_alphanumeric() || "-/_.".contains(c)),
-            "Completion line has unexpected characters: {}",
-            line
-        );
     }
 
     Ok(())
@@ -81,16 +75,16 @@ fn test_jump_completion_output_format() -> Result<()> {
 fn test_remove_completion_output_format() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create worktrees with edge case names
-    let branches = [
-        "main-backup",
-        "feature/user-profile",
-        "bugfix/memory_leak",
-        "chore/update-deps",
+    // Create worktrees with feature names
+    let worktrees = [
+        ("main-backup", "main-backup"),
+        ("user-profile", "feature/user-profile"),
+        ("memory-leak", "bugfix/memory_leak"),
+        ("update-deps", "chore/update-deps"),
     ];
 
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Test completion output
@@ -100,16 +94,16 @@ fn test_remove_completion_output_format() -> Result<()> {
     let lines: Vec<&str> = output.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
-        branches.len(),
+        worktrees.len(),
         "Should output one line per worktree"
     );
 
-    // Verify exact branch names (no sanitization in completion output)
-    for branch in &branches {
+    // Verify exact feature names in completion output
+    for (feature, _) in &worktrees {
         assert!(
-            lines.contains(branch),
+            lines.contains(feature),
             "Remove completion should include: {}",
-            branch
+            feature
         );
     }
 
@@ -144,9 +138,12 @@ fn test_completion_current_repo_filtering() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees in current repo
-    let current_branches = ["feature/current-1", "feature/current-2"];
-    for branch in &current_branches {
-        env.run_command(&["create", branch])?.assert().success();
+    let current_worktrees = [
+        ("current-1", "feature/current-1"),
+        ("current-2", "feature/current-2"),
+    ];
+    for (feature, branch) in &current_worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Test current repo only filtering for jump
@@ -157,11 +154,11 @@ fn test_completion_current_repo_filtering() -> Result<()> {
         .filter(|l| !l.is_empty())
         .collect();
 
-    for branch in &current_branches {
+    for (feature, _) in &current_worktrees {
         assert!(
-            jump_lines.contains(branch),
+            jump_lines.contains(feature),
             "Current repo filter should include: {}",
-            branch
+            feature
         );
     }
 
@@ -173,11 +170,11 @@ fn test_completion_current_repo_filtering() -> Result<()> {
         .filter(|l| !l.is_empty())
         .collect();
 
-    for branch in &current_branches {
+    for (feature, _) in &current_worktrees {
         assert!(
-            remove_lines.contains(branch),
+            remove_lines.contains(feature),
             "Current repo filter should include: {}",
-            branch
+            feature
         );
     }
 
@@ -196,16 +193,16 @@ fn test_completion_output_stability() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees in non-alphabetical order
-    let branches = [
-        "z-last-feature",
-        "a-first-feature",
-        "m-middle-feature",
-        "feature/zebra",
-        "feature/alpha",
+    let worktrees = [
+        ("z-last-feature", "z-last-feature"),
+        ("a-first-feature", "a-first-feature"),
+        ("m-middle-feature", "m-middle-feature"),
+        ("zebra", "feature/zebra"),
+        ("alpha", "feature/alpha"),
     ];
 
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Get completion output multiple times
@@ -220,55 +217,55 @@ fn test_completion_output_stability() -> Result<()> {
         "Jump and remove completions should be identical"
     );
 
-    // Verify all branches are present
+    // Verify all feature names are present
     let lines: Vec<&str> = output1.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
-        branches.len(),
+        worktrees.len(),
         "Should include all created worktrees"
     );
 
-    for branch in &branches {
-        assert!(lines.contains(branch), "Should include branch: {}", branch);
+    for (feature, _) in &worktrees {
+        assert!(lines.contains(feature), "Should include feature: {}", feature);
     }
 
     Ok(())
 }
 
-/// Test completion output with special characters in branch names
+/// Test completion output with feature names containing special characters
 #[test]
-fn test_completion_special_characters() -> Result<()> {
+fn test_completion_feature_names() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create branches with special characters that get sanitized for filesystem
-    let branches = [
-        "feature/user_profile",
-        "bugfix/issue-123",
-        "hotfix/fix-critical",
-        "feature/api-v2.1",
+    // Feature names can contain hyphens, underscores, dots — but not slashes
+    let worktrees = [
+        ("user-profile", "feature/user_profile"),
+        ("issue-123", "bugfix/issue-123"),
+        ("fix-critical", "hotfix/fix-critical"),
+        ("api-v2-1", "feature/api-v2.1"),
     ];
 
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Get completion output
     let output = get_stdout(&env, &["jump", "--list-completions"])?;
     let lines: Vec<&str> = output.trim().split('\n').collect();
 
-    // Verify original branch names appear in completions (not sanitized versions)
-    for branch in &branches {
+    // Verify feature names appear in completions
+    for (feature, _) in &worktrees {
         assert!(
-            lines.contains(branch),
-            "Should complete original branch name: {}",
-            branch
+            lines.contains(feature),
+            "Should complete feature name: {}",
+            feature
         );
     }
 
-    // Verify completions show the original branch names (this test focuses on format consistency)
+    // Verify completions show feature names (not branch names)
     assert_eq!(
         lines.len(),
-        branches.len(),
+        worktrees.len(),
         "Should have correct number of completions"
     );
 
@@ -297,20 +294,23 @@ fn test_completion_with_config_setup() -> Result<()> {
     )?;
 
     // Create worktrees
-    let branches = ["feature/with-config", "bugfix/also-config"];
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    let worktrees = [
+        ("with-config", "feature/with-config"),
+        ("also-config", "bugfix/also-config"),
+    ];
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Verify completions work normally regardless of config setup
     let output = get_stdout(&env, &["jump", "--list-completions"])?;
     let lines: Vec<&str> = output.trim().split('\n').collect();
 
-    for branch in &branches {
+    for (feature, _) in &worktrees {
         assert!(
-            lines.contains(branch),
+            lines.contains(feature),
             "Config setup should not affect completions: {}",
-            branch
+            feature
         );
     }
 
@@ -322,8 +322,8 @@ fn test_completion_with_config_setup() -> Result<()> {
 fn test_completion_output_encoding() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create a single worktree to test output format
-    env.run_command(&["create", "test/encoding"])?
+    // Create a single worktree
+    env.run_command(&["create", "test-encoding", "feature/encoding"])?
         .assert()
         .success();
 
@@ -341,8 +341,8 @@ fn test_completion_output_encoding() -> Result<()> {
     );
     assert_eq!(
         output.trim(),
-        "test/encoding",
-        "Should output exact branch name"
+        "test-encoding",
+        "Should output exact feature name"
     );
 
     // Verify no carriage returns or other special characters
@@ -355,28 +355,29 @@ fn test_completion_output_encoding() -> Result<()> {
     Ok(())
 }
 
-/// Test completion with very long branch names
+/// Test completion with very long feature names
 #[test]
-fn test_completion_long_branch_names() -> Result<()> {
+fn test_completion_long_feature_names() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create worktree with very long branch name
-    let long_branch = "feature/this-is-a-very-long-branch-name-that-tests-how-completions-handle-lengthy-identifiers-with-multiple-segments";
-    env.run_command(&["create", long_branch])?
+    // Create worktree with very long feature name
+    let long_feature = "this-is-a-very-long-feature-name-that-tests-how-completions-handle-lengthy-identifiers-with-multiple-segments";
+    let long_branch = "feature/very-long-branch-name-for-testing";
+    env.run_command(&["create", long_feature, long_branch])?
         .assert()
         .success();
 
     let output = get_stdout(&env, &["jump", "--list-completions"])?;
 
-    // Verify long branch name is included complete and untruncated
+    // Verify long feature name is included complete and untruncated
     assert!(
-        output.contains(long_branch),
-        "Should include full long branch name"
+        output.contains(long_feature),
+        "Should include full long feature name"
     );
     assert_eq!(
         output.trim(),
-        long_branch,
-        "Should output complete branch name without truncation"
+        long_feature,
+        "Should output complete feature name without truncation"
     );
 
     Ok(())
@@ -388,15 +389,15 @@ fn test_completion_error_handling() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree then manually corrupt its storage
-    env.run_command(&["create", "test/corrupt"])?
+    env.run_command(&["create", "test-corrupt", "feature/corrupt"])?
         .assert()
         .success();
 
     // Remove the actual worktree directory while keeping storage entry
-    let worktree_path = env.worktree_path("test/corrupt");
+    let worktree_path = env.worktree_path("test-corrupt");
     let _ = std::fs::remove_dir_all(worktree_path.child(".git").path()); // This might fail, that's ok
 
-    // Completions should still work (might return the branch or skip it gracefully)
+    // Completions should still work (might return the feature or skip it gracefully)
     let result = env.run_command(&["jump", "--list-completions"]);
 
     // Command should not panic/crash, regardless of whether it includes the corrupted entry
@@ -420,31 +421,32 @@ fn test_completion_performance_many_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create many worktrees to test performance
-    let mut branches = Vec::new();
+    let mut features = Vec::new();
     for i in 0..50 {
+        let feature = format!("test-{:03}", i);
         let branch = format!("feature/test-{:03}", i);
-        branches.push(branch.clone());
-        env.run_command(&["create", &branch])?.assert().success();
+        features.push(feature.clone());
+        env.run_command(&["create", &feature, &branch])?.assert().success();
     }
 
     // Test completion still works efficiently
     let output = get_stdout(&env, &["jump", "--list-completions"])?;
     let lines: Vec<&str> = output.trim().split('\n').collect();
 
-    assert_eq!(lines.len(), branches.len(), "Should list all worktrees");
+    assert_eq!(lines.len(), features.len(), "Should list all worktrees");
 
-    // Verify random sampling of branches
+    // Verify random sampling of feature names
     assert!(
-        lines.contains(&"feature/test-000"),
-        "Should include first branch"
+        lines.contains(&"test-000"),
+        "Should include first feature"
     );
     assert!(
-        lines.contains(&"feature/test-025"),
-        "Should include middle branch"
+        lines.contains(&"test-025"),
+        "Should include middle feature"
     );
     assert!(
-        lines.contains(&"feature/test-049"),
-        "Should include last branch"
+        lines.contains(&"test-049"),
+        "Should include last feature"
     );
 
     Ok(())

@@ -37,13 +37,14 @@ fn test_concurrent_environment_creation() -> Result<()> {
             let env = CliTestEnvironment::new()?;
 
             // Perform basic operations to ensure environment is functional
+            let feature_name = format!("parallel-test-{}", i);
             let branch_name = format!("feature/parallel-test-{}", i);
-            env.run_command(&["create", &branch_name])?
+            env.run_command(&["create", &feature_name, &branch_name])?
                 .assert()
                 .success();
 
             // Verify the worktree was created properly
-            let worktree_path = env.worktree_path(&branch_name);
+            let worktree_path = env.worktree_path(&feature_name);
             worktree_path.assert(predicates::path::exists());
 
             // Test basic operations
@@ -77,10 +78,11 @@ fn test_storage_isolation() -> Result<()> {
     // Create multiple test environments
     for i in 0..num_envs {
         let env = CliTestEnvironment::new()?;
+        let feature_name = format!("isolation-{}", i);
         let branch_name = format!("feature/isolation-{}", i);
 
         // Create a worktree in each environment
-        env.run_command(&["create", &branch_name])?
+        env.run_command(&["create", &feature_name, &branch_name])?
             .assert()
             .success();
 
@@ -103,24 +105,24 @@ fn test_storage_isolation() -> Result<()> {
     for (i, env) in environments.iter().enumerate() {
         let output_str = get_stdout(env, &["list"])?;
 
-        // Should contain own worktree
-        let own_branch = format!("feature/isolation-{}", i);
+        // Should contain own worktree (feature name appears in list output)
+        let own_feature = format!("isolation-{}", i);
         assert!(
-            output_str.contains(&own_branch),
+            output_str.contains(&own_feature),
             "Environment {} should see its own worktree {}",
             i,
-            own_branch
+            own_feature
         );
 
         // Should not contain other worktrees
         for j in 0..num_envs {
             if i != j {
-                let other_branch = format!("feature/isolation-{}", j);
+                let other_feature = format!("isolation-{}", j);
                 assert!(
-                    !output_str.contains(&other_branch),
+                    !output_str.contains(&other_feature),
                     "Environment {} should not see worktree {} from environment {}",
                     i,
-                    other_branch,
+                    other_feature,
                     j
                 );
             }
@@ -162,17 +164,17 @@ fn test_repository_isolation() -> Result<()> {
         .child("file1.txt")
         .assert(predicates::path::missing());
 
-    // Create worktrees with the same name in both environments
-    env1.run_command(&["create", "feature/same-name"])?
+    // Create worktrees with the same feature name in both environments
+    env1.run_command(&["create", "same-name", "feature/same-name"])?
         .assert()
         .success();
-    env2.run_command(&["create", "feature/same-name"])?
+    env2.run_command(&["create", "same-name", "feature/same-name"])?
         .assert()
         .success();
 
     // Verify they're in different locations
-    let worktree1 = env1.worktree_path("feature/same-name");
-    let worktree2 = env2.worktree_path("feature/same-name");
+    let worktree1 = env1.worktree_path("same-name");
+    let worktree2 = env2.worktree_path("same-name");
 
     assert_ne!(
         worktree1.path(),
@@ -198,10 +200,10 @@ fn test_config_isolation() -> Result<()> {
     create_worktree_config(&env2.repo_dir, &[".vscode/", "*.json"], &["node_modules/"])?;
 
     // Create worktrees in each environment
-    env1.run_command(&["create", "feature/config1"])?
+    env1.run_command(&["create", "config1", "feature/config1"])?
         .assert()
         .success();
-    env2.run_command(&["create", "feature/config2"])?
+    env2.run_command(&["create", "config2", "feature/config2"])?
         .assert()
         .success();
 
@@ -216,10 +218,10 @@ fn test_config_isolation() -> Result<()> {
         .write_str(r#"{"env2": true}"#)?;
 
     // Test sync within each environment (should work with their own configs)
-    let source1 = env1.worktree_path("feature/config1");
+    let source1 = env1.worktree_path("config1");
     source1.child(".env").write_str("UPDATED_ENV1=true")?;
 
-    let source2 = env2.worktree_path("feature/config2");
+    let source2 = env2.worktree_path("config2");
     source2.child(".vscode").create_dir_all()?;
     source2
         .child(".vscode")
@@ -265,8 +267,11 @@ fn test_concurrent_worktree_operations() -> Result<()> {
 
     // Pre-create some worktrees for concurrent reading
     for i in 0..5 {
+        let feature = format!("pre-created-{}", i);
         let branch = format!("feature/pre-created-{}", i);
-        env.run_command(&["create", &branch])?.assert().success();
+        env.run_command(&["create", &feature, &branch])?
+            .assert()
+            .success();
     }
 
     let num_threads = 3;
@@ -299,9 +304,11 @@ fn test_concurrent_worktree_operations() -> Result<()> {
                 }
                 2 => {
                     // Thread 2: Create one new worktree with unique name
-                    let unique_branch = format!("concurrent/thread-{}-unique", std::process::id());
+                    let unique_feature = format!("thread-{}-unique", std::process::id());
+                    let unique_branch =
+                        format!("concurrent/thread-{}-unique", std::process::id());
                     env_clone
-                        .run_command(&["create", &unique_branch])?
+                        .run_command(&["create", &unique_feature, &unique_branch])?
                         .assert()
                         .success();
 
@@ -329,18 +336,18 @@ fn test_concurrent_worktree_operations() -> Result<()> {
     let output_str = get_stdout(&env, &["list"])?;
 
     for i in 0..5 {
-        let branch = format!("feature/pre-created-{}", i);
+        let feature = format!("pre-created-{}", i);
         assert!(
-            output_str.contains(&branch),
+            output_str.contains(&feature),
             "Should contain worktree {}",
-            branch
+            feature
         );
     }
 
     // Verify the unique concurrent worktree was created
-    let unique_branch = format!("concurrent/thread-{}-unique", std::process::id());
+    let unique_feature = format!("thread-{}-unique", std::process::id());
     assert!(
-        output_str.contains(&unique_branch),
+        output_str.contains(&unique_feature),
         "Should contain concurrent worktree"
     );
 
@@ -354,10 +361,10 @@ fn test_cleanup_isolation() -> Result<()> {
     let temp_path1 = env1.repo_dir.path().to_path_buf();
 
     // Create a worktree
-    env1.run_command(&["create", "feature/cleanup-test"])?
+    env1.run_command(&["create", "cleanup-test", "feature/cleanup-test"])?
         .assert()
         .success();
-    let worktree_path1 = env1.worktree_path("feature/cleanup-test");
+    let worktree_path1 = env1.worktree_path("cleanup-test");
     worktree_path1.assert(predicates::path::exists());
 
     // Drop env1 (simulating test cleanup)
@@ -374,21 +381,21 @@ fn test_cleanup_isolation() -> Result<()> {
     );
 
     // Verify new environment works independently
-    env2.run_command(&["create", "feature/new-test"])?
+    env2.run_command(&["create", "new-test", "feature/new-test"])?
         .assert()
         .success();
-    let worktree_path2 = env2.worktree_path("feature/new-test");
+    let worktree_path2 = env2.worktree_path("new-test");
     worktree_path2.assert(predicates::path::exists());
 
     // Verify we can't see the old environment's worktrees
     let output_str = get_stdout(&env2, &["list"])?;
 
     assert!(
-        output_str.contains("feature/new-test"),
+        output_str.contains("new-test"),
         "Should see new worktree"
     );
     assert!(
-        !output_str.contains("feature/cleanup-test"),
+        !output_str.contains("cleanup-test"),
         "Should not see old worktree"
     );
 
@@ -411,10 +418,10 @@ fn test_environment_variable_isolation() -> Result<()> {
     // This is ensured by our CliTestEnvironment setting WORKTREE_STORAGE_ROOT
 
     // Create worktrees in each environment
-    env1.run_command(&["create", "feature/env1"])?
+    env1.run_command(&["create", "env1", "feature/env1"])?
         .assert()
         .success();
-    env2.run_command(&["create", "feature/env2"])?
+    env2.run_command(&["create", "env2", "feature/env2"])?
         .assert()
         .success();
 
@@ -423,20 +430,20 @@ fn test_environment_variable_isolation() -> Result<()> {
     let output2 = get_stdout(&env2, &["list"])?;
 
     assert!(
-        output1.contains("feature/env1"),
+        output1.contains("env1"),
         "Env1 should see its worktree"
     );
     assert!(
-        !output1.contains("feature/env2"),
+        !output1.contains("env2"),
         "Env1 should not see env2's worktree"
     );
 
     assert!(
-        output2.contains("feature/env2"),
+        output2.contains("env2"),
         "Env2 should see its worktree"
     );
     assert!(
-        !output2.contains("feature/env1"),
+        !output2.contains("env1"),
         "Env2 should not see env1's worktree"
     );
 
@@ -458,16 +465,16 @@ fn test_git_isolation() -> Result<()> {
         .write_str("Environment 2 content")?;
 
     // Create worktrees that might have the same branch names
-    env1.run_command(&["create", "feature/git-test"])?
+    env1.run_command(&["create", "git-test", "feature/git-test"])?
         .assert()
         .success();
-    env2.run_command(&["create", "feature/git-test"])?
+    env2.run_command(&["create", "git-test", "feature/git-test"])?
         .assert()
         .success();
 
     // Verify each worktree is in its own git repository context
-    let worktree1 = env1.worktree_path("feature/git-test");
-    let worktree2 = env2.worktree_path("feature/git-test");
+    let worktree1 = env1.worktree_path("git-test");
+    let worktree2 = env2.worktree_path("git-test");
 
     // Both should exist but in different locations
     worktree1.assert(predicates::path::exists());
@@ -498,8 +505,11 @@ fn test_stress_isolation() -> Result<()> {
         let env = CliTestEnvironment::new()?;
 
         // Perform operations in each
+        let feature = format!("stress-test-{}", i);
         let branch = format!("stress/test-{}", i);
-        env.run_command(&["create", &branch])?.assert().success();
+        env.run_command(&["create", &feature, &branch])?
+            .assert()
+            .success();
 
         // Store for later verification
         environments.push(env);
@@ -510,31 +520,31 @@ fn test_stress_isolation() -> Result<()> {
         let output_str = get_stdout(env, &["list"])?;
 
         // Should see own worktree
-        let own_branch = format!("stress/test-{}", i);
+        let own_feature = format!("stress-test-{}", i);
         assert!(
-            output_str.contains(&own_branch),
+            output_str.contains(&own_feature),
             "Env {} should see {}",
             i,
-            own_branch
+            own_feature
         );
 
         // Should not see others (spot check a few)
         if i > 0 {
-            let other_branch = format!("stress/test-{}", i - 1);
+            let other_feature = format!("stress-test-{}", i - 1);
             assert!(
-                !output_str.contains(&other_branch),
+                !output_str.contains(&other_feature),
                 "Env {} should not see {}",
                 i,
-                other_branch
+                other_feature
             );
         }
         if i < num_iterations - 1 {
-            let other_branch = format!("stress/test-{}", i + 1);
+            let other_feature = format!("stress-test-{}", i + 1);
             assert!(
-                !output_str.contains(&other_branch),
+                !output_str.contains(&other_feature),
                 "Env {} should not see {}",
                 i,
-                other_branch
+                other_feature
             );
         }
     }

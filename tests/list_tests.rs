@@ -35,21 +35,25 @@ fn test_list_empty() -> Result<()> {
 fn test_list_multiple_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create several worktrees
-    let branches = ["feature/list-test", "bugfix/minor", "release/v1.0"];
-    for branch in &branches {
-        env.run_command(&["create", branch])?.assert().success();
+    // Create several worktrees using feature-name + branch pairs
+    let worktrees = [
+        ("list-test", "feature/list-test"),
+        ("minor-fix", "bugfix/minor"),
+        ("release-v1", "release/v1.0"),
+    ];
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
     // Test list command
     let output = get_stdout(&env, &["list"])?;
 
-    // All branches should appear in the output
-    for branch in &branches {
+    // All feature names should appear in the output
+    for (feature, _) in &worktrees {
         assert!(
-            output.contains(branch),
-            "List output should contain branch: {}",
-            branch
+            output.contains(feature),
+            "List output should contain feature: {}",
+            feature
         );
     }
 
@@ -62,7 +66,7 @@ fn test_list_current_repo() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree
-    env.run_command(&["create", "feature/current-test"])?
+    env.run_command(&["create", "current-test", "feature/current-test"])?
         .assert()
         .success();
 
@@ -70,7 +74,7 @@ fn test_list_current_repo() -> Result<()> {
     let output = get_stdout(&env, &["list", "--current"])?;
 
     assert!(
-        output.contains("feature/current-test"),
+        output.contains("current-test"),
         "List --current should show current repo worktrees"
     );
 

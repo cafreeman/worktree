@@ -19,18 +19,18 @@ use test_support::{
 fn test_sync_config_between_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create source and target worktrees
-    env.run_command(&["create", "feature/source"])?
+    // Create source and target worktrees using feature-name + branch pairs
+    env.run_command(&["create", "source", "feature/source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/target"])?
+    env.run_command(&["create", "target", "feature/target"])?
         .assert()
         .success();
 
     // Verify worktrees exist
-    let source_path = env.worktree_path("feature/source");
-    let target_path = env.worktree_path("feature/target");
+    let source_path = env.worktree_path("source");
+    let target_path = env.worktree_path("target");
     source_path.assert(predicate::path::is_dir());
     target_path.assert(predicate::path::is_dir());
 
@@ -38,7 +38,7 @@ fn test_sync_config_between_worktrees() -> Result<()> {
     create_sample_config_files(&source_path)?;
 
     // Test sync-config command
-    env.run_command(&["sync-config", "feature/source", "feature/target"])?
+    env.run_command(&["sync-config", "source", "target"])?
         .assert()
         .success();
 
@@ -70,16 +70,16 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
     )?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/custom-source"])?
+    env.run_command(&["create", "custom-source", "feature/custom-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/custom-target"])?
+    env.run_command(&["create", "custom-target", "feature/custom-target"])?
         .assert()
         .success();
 
-    let source_path = env.worktree_path("feature/custom-source");
-    let target_path = env.worktree_path("feature/custom-target");
+    let source_path = env.worktree_path("custom-source");
+    let target_path = env.worktree_path("custom-target");
 
     // Create config files matching our custom patterns
     source_path
@@ -102,8 +102,8 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
     // Test sync
     env.run_command(&[
         "sync-config",
-        "feature/custom-source",
-        "feature/custom-target",
+        "custom-source",
+        "custom-target",
     ])?
     .assert()
     .success();
@@ -132,16 +132,16 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/abs-source"])?
+    env.run_command(&["create", "abs-source", "feature/abs-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/abs-target"])?
+    env.run_command(&["create", "abs-target", "feature/abs-target"])?
         .assert()
         .success();
 
-    let source_path = env.worktree_path("feature/abs-source");
-    let target_path = env.worktree_path("feature/abs-target");
+    let source_path = env.worktree_path("abs-source");
+    let target_path = env.worktree_path("abs-target");
 
     // Create config files that match default patterns
     source_path
@@ -171,28 +171,28 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
     Ok(())
 }
 
-/// Test sync command with sanitized branch names
+/// Test sync with feature names (no slash required)
 #[test]
-fn test_sync_config_with_sanitized_names() -> Result<()> {
+fn test_sync_config_with_feature_names() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create worktrees with special characters
-    env.run_command(&["create", "feature/sync-source"])?
+    // Create worktrees using feature names
+    env.run_command(&["create", "sync-source", "feature/sync-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/sync-target"])?
+    env.run_command(&["create", "sync-target", "feature/sync-target"])?
         .assert()
         .success();
 
-    let source_path = env.worktree_path("feature/sync-source");
-    let target_path = env.worktree_path("feature/sync-target");
+    let source_path = env.worktree_path("sync-source");
+    let target_path = env.worktree_path("sync-target");
 
     // Create config files
     create_sample_config_files(&source_path)?;
 
-    // Test sync using original branch names (with special chars)
-    env.run_command(&["sync-config", "feature/sync-source", "feature/sync-target"])?
+    // Test sync using feature names directly
+    env.run_command(&["sync-config", "sync-source", "sync-target"])?
         .assert()
         .success();
 
@@ -208,12 +208,12 @@ fn test_sync_config_nonexistent_source() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create only target worktree
-    env.run_command(&["create", "feature/target-only"])?
+    env.run_command(&["create", "target-only", "feature/target-only"])?
         .assert()
         .success();
 
     // Try to sync from nonexistent source
-    env.run_command(&["sync-config", "nonexistent", "feature/target-only"])?
+    env.run_command(&["sync-config", "nonexistent", "target-only"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -227,12 +227,12 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create only source worktree
-    env.run_command(&["create", "feature/source-only"])?
+    env.run_command(&["create", "source-only", "feature/source-only"])?
         .assert()
         .success();
 
     // Try to sync to nonexistent target
-    env.run_command(&["sync-config", "feature/source-only", "nonexistent"])?
+    env.run_command(&["sync-config", "source-only", "nonexistent"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -253,16 +253,16 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
     )?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/exclude-source"])?
+    env.run_command(&["create", "exclude-source", "feature/exclude-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/exclude-target"])?
+    env.run_command(&["create", "exclude-target", "feature/exclude-target"])?
         .assert()
         .success();
 
-    let source_path = env.worktree_path("feature/exclude-source");
-    let target_path = env.worktree_path("feature/exclude-target");
+    let source_path = env.worktree_path("exclude-source");
+    let target_path = env.worktree_path("exclude-target");
 
     // Create files that should be copied
     source_path.child(".env").write_str("SHOULD_COPY=yes")?;
@@ -282,8 +282,8 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
     // Test sync
     env.run_command(&[
         "sync-config",
-        "feature/exclude-source",
-        "feature/exclude-target",
+        "exclude-source",
+        "exclude-target",
     ])?
     .assert()
     .success();
@@ -316,16 +316,16 @@ fn test_sync_config_preserves_content() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/preserve-source"])?
+    env.run_command(&["create", "preserve-source", "feature/preserve-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/preserve-target"])?
+    env.run_command(&["create", "preserve-target", "feature/preserve-target"])?
         .assert()
         .success();
 
-    let source_path = env.worktree_path("feature/preserve-source");
-    let target_path = env.worktree_path("feature/preserve-target");
+    let source_path = env.worktree_path("preserve-source");
+    let target_path = env.worktree_path("preserve-target");
 
     // Create a complex config file with specific content
     let complex_config = r#"{
@@ -345,8 +345,8 @@ fn test_sync_config_preserves_content() -> Result<()> {
     // Test sync
     env.run_command(&[
         "sync-config",
-        "feature/preserve-source",
-        "feature/preserve-target",
+        "preserve-source",
+        "preserve-target",
     ])?
     .assert()
     .success();
@@ -368,11 +368,11 @@ fn test_sync_config_empty_source() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/empty-source"])?
+    env.run_command(&["create", "empty-source", "feature/empty-source"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/empty-target"])?
+    env.run_command(&["create", "empty-target", "feature/empty-target"])?
         .assert()
         .success();
 
@@ -381,14 +381,14 @@ fn test_sync_config_empty_source() -> Result<()> {
     // Test sync - should succeed but copy nothing
     env.run_command(&[
         "sync-config",
-        "feature/empty-source",
-        "feature/empty-target",
+        "empty-source",
+        "empty-target",
     ])?
     .assert()
     .success();
 
     // Verify target remains clean (just git files)
-    let target_path = env.worktree_path("feature/empty-target");
+    let target_path = env.worktree_path("empty-target");
     target_path.child(".git").assert(predicate::path::exists());
 
     // But no config files should exist

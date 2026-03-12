@@ -38,171 +38,36 @@ impl WorktreeStorage {
         }
     }
 
-    #[must_use]
-    pub fn sanitize_branch_name(branch_name: &str) -> String {
-        branch_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "-")
-    }
-
-    #[must_use]
-    pub fn get_worktree_path(&self, repo_name: &str, branch_name: &str) -> PathBuf {
-        let safe_branch_name = Self::sanitize_branch_name(branch_name);
-        self.root_dir.join(repo_name).join(safe_branch_name)
-    }
-
-    /// Returns the path to the managed-branch flag file for a given branch
-    fn get_managed_branch_flag_path(&self, repo_name: &str, branch_name: &str) -> PathBuf {
-        let safe_branch_name = Self::sanitize_branch_name(branch_name);
-        self.root_dir
-            .join(repo_name)
-            .join(".managed-branches")
-            .join(safe_branch_name)
-    }
-
-    /// Retrieves the original branch name from a sanitized name
+    /// Validates a feature name, rejecting characters that are invalid for directory names.
+    ///
+    /// Feature names must not contain: `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`
     ///
     /// # Errors
-    /// Returns an error if:
-    /// - Failed to read the mapping file
-    /// - Failed to parse the mapping data
-    pub fn get_original_branch_name(
-        &self,
-        repo_name: &str,
-        sanitized_name: &str,
-    ) -> Result<Option<String>> {
-        // We need a way to map back from sanitized names to original branch names
-        // For now, we'll store a mapping file in each repo directory
-        let mapping_file = self.root_dir.join(repo_name).join(".branch-mapping");
-
-        if !mapping_file.exists() {
-            return Ok(None);
+    /// Returns an error if the name contains invalid characters or is empty.
+    pub fn validate_feature_name(name: &str) -> Result<()> {
+        if name.trim().is_empty() {
+            anyhow::bail!("Feature name cannot be empty");
         }
 
-        let content = std::fs::read_to_string(&mapping_file)?;
-        for line in content.lines() {
-            if let Some((sanitized, original)) = line.split_once(" -> ") {
-                if sanitized == sanitized_name {
-                    return Ok(Some(original.to_string()));
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
-    /// Returns all (sanitized, original) pairs from the branch mapping file
-    ///
-    /// # Errors
-    /// Returns an error if reading the mapping file fails
-    fn read_all_branch_mappings(
-        &self,
-        repo_name: &str,
-    ) -> Result<Vec<(String, String)>> {
-        let mapping_file = self.root_dir.join(repo_name).join(".branch-mapping");
-
-        if !mapping_file.exists() {
-            return Ok(vec![]);
-        }
-
-        let content = std::fs::read_to_string(&mapping_file)?;
-        let mut pairs = Vec::new();
-        for line in content.lines() {
-            if let Some((sanitized, original)) = line.split_once(" -> ") {
-                pairs.push((sanitized.to_string(), original.to_string()));
-            }
-        }
-        Ok(pairs)
-    }
-
-    /// Stores a mapping between original and sanitized branch names
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - Failed to create the mapping directory
-    /// - Failed to write the mapping file
-    /// - Failed to serialize the mapping data
-    /// - A different branch already maps to the same sanitized form (collision)
-    pub fn store_branch_mapping(
-        &self,
-        repo_name: &str,
-        original_branch: &str,
-        sanitized_branch: &str,
-    ) -> Result<()> {
-        let repo_dir = self.root_dir.join(repo_name);
-        std::fs::create_dir_all(&repo_dir)?;
-
-        // Check for collision: another original branch already maps to the same sanitized name
-        let existing_mappings = self.read_all_branch_mappings(repo_name)?;
-        for (existing_sanitized, existing_original) in &existing_mappings {
-            if existing_sanitized == sanitized_branch && existing_original != original_branch {
+        let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+        for ch in invalid_chars {
+            if name.contains(ch) {
                 anyhow::bail!(
-                    "Branch name '{}' conflicts with the sanitized form of existing branch '{}'",
-                    sanitized_branch,
-                    existing_original
+                    "Feature name '{}' contains invalid character '{}'. \
+                     Feature names cannot contain: / \\ : * ? \" < > |",
+                    name,
+                    ch
                 );
             }
         }
 
-        let mapping_file = repo_dir.join(".branch-mapping");
-        let mapping_entry = format!("{} -> {}\n", sanitized_branch, original_branch);
-
-        // Read existing mappings
-        let mut existing_content = if mapping_file.exists() {
-            std::fs::read_to_string(&mapping_file)?
-        } else {
-            String::new()
-        };
-
-        // Check if mapping already exists (exact line match)
-        let search_line = format!("{} -> {}", sanitized_branch, original_branch);
-        if !existing_content.lines().any(|line| line == search_line) {
-            existing_content.push_str(&mapping_entry);
-            // Write atomically: write to temp then rename
-            let tmp_path = mapping_file.with_extension("tmp");
-            std::fs::write(&tmp_path, &existing_content)?;
-            std::fs::rename(&tmp_path, &mapping_file)?;
-        }
-
         Ok(())
     }
 
-    /// Removes a mapping entry for the given original branch name
-    ///
-    /// # Errors
-    /// Returns an error if reading or writing the mapping file fails
-    pub fn remove_branch_mapping(&self, repo_name: &str, original_branch: &str) -> Result<()> {
-        let mapping_file = self.root_dir.join(repo_name).join(".branch-mapping");
-
-        if !mapping_file.exists() {
-            return Ok(());
-        }
-
-        let content = std::fs::read_to_string(&mapping_file)?;
-
-        // Keep lines that do not map to this original branch
-        let new_content: String = content
-            .lines()
-            .filter(|line| {
-                if let Some((_sanitized, original)) = line.split_once(" -> ") {
-                    original != original_branch
-                } else {
-                    true
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let final_content = if new_content.is_empty() {
-            String::new()
-        } else {
-            format!("{}\n", new_content)
-        };
-
-        // Write atomically: write to temp then rename
-        let tmp_path = mapping_file.with_extension("tmp");
-        std::fs::write(&tmp_path, &final_content)?;
-        std::fs::rename(&tmp_path, &mapping_file)?;
-
-        Ok(())
+    /// Returns the worktree path for the given feature name (no sanitization)
+    #[must_use]
+    pub fn get_worktree_path(&self, repo_name: &str, feature_name: &str) -> PathBuf {
+        self.root_dir.join(repo_name).join(feature_name)
     }
 
     /// Lists all worktrees for a specific repository
@@ -223,8 +88,8 @@ impl WorktreeStorage {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 if let Some(name) = entry.file_name().to_str() {
-                    // Skip the .managed-branches directory as it's not a worktree
-                    if name != ".managed-branches" {
+                    // Skip hidden directories (e.g. .git metadata)
+                    if !name.starts_with('.') {
                         worktrees.push(name.to_string());
                     }
                 }
@@ -272,41 +137,7 @@ impl WorktreeStorage {
         &self.root_dir
     }
 
-    /// Marks a branch as managed by this CLI (created via worktree create)
-    ///
-    /// # Errors
-    /// Returns an error if the marker file cannot be created
-    pub fn mark_branch_managed(&self, repo_name: &str, branch_name: &str) -> Result<()> {
-        let repo_dir = self.root_dir.join(repo_name).join(".managed-branches");
-        std::fs::create_dir_all(&repo_dir)?;
-
-        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
-
-        // Write atomically: write to temp then rename
-        let tmp_path = flag_path.with_extension("tmp");
-        std::fs::write(&tmp_path, b"1")?;
-        std::fs::rename(&tmp_path, &flag_path)?;
-
-        Ok(())
-    }
-
-    /// Checks if a branch is managed by this CLI
-    #[must_use]
-    pub fn is_branch_managed(&self, repo_name: &str, branch_name: &str) -> bool {
-        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
-        flag_path.exists()
-    }
-
-    /// Unmarks a branch as managed by this CLI
-    pub fn unmark_branch_managed(&self, repo_name: &str, branch_name: &str) {
-        let flag_path = self.get_managed_branch_flag_path(repo_name, branch_name);
-        if flag_path.exists() {
-            // Ignore error if already removed by concurrent cleanup
-            let _ = std::fs::remove_file(&flag_path);
-        }
-    }
-
-    /// Stores origin information for a worktree
+    /// Stores origin information for a worktree (keyed by feature name)
     ///
     /// # Errors
     /// Returns an error if:
@@ -315,15 +146,14 @@ impl WorktreeStorage {
     pub fn store_worktree_origin(
         &self,
         repo_name: &str,
-        branch_name: &str,
+        feature_name: &str,
         origin_path: &str,
     ) -> Result<()> {
         let repo_dir = self.root_dir.join(repo_name);
         std::fs::create_dir_all(&repo_dir)?;
 
         let origin_mapping_file = repo_dir.join(".worktree-origins");
-        let sanitized_branch = Self::sanitize_branch_name(branch_name);
-        let mapping_entry = format!("{} -> {}\n", sanitized_branch, origin_path);
+        let mapping_entry = format!("{} -> {}\n", feature_name, origin_path);
 
         // Read existing mappings
         let mut existing_content = if origin_mapping_file.exists() {
@@ -333,7 +163,7 @@ impl WorktreeStorage {
         };
 
         // Check if mapping already exists (exact line match)
-        let search_line = format!("{} -> {}", sanitized_branch, origin_path);
+        let search_line = format!("{} -> {}", feature_name, origin_path);
         if !existing_content.lines().any(|line| line == search_line) {
             existing_content.push_str(&mapping_entry);
             // Write atomically: write to temp then rename
@@ -345,7 +175,7 @@ impl WorktreeStorage {
         Ok(())
     }
 
-    /// Retrieves origin information for a worktree
+    /// Retrieves origin information for a worktree (keyed by feature name)
     ///
     /// # Errors
     /// Returns an error if:
@@ -353,7 +183,7 @@ impl WorktreeStorage {
     pub fn get_worktree_origin(
         &self,
         repo_name: &str,
-        branch_name: &str,
+        feature_name: &str,
     ) -> Result<Option<String>> {
         let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
 
@@ -362,11 +192,10 @@ impl WorktreeStorage {
         }
 
         let content = std::fs::read_to_string(&origin_mapping_file)?;
-        let sanitized_branch = Self::sanitize_branch_name(branch_name);
 
         for line in content.lines() {
-            if let Some((branch, origin)) = line.split_once(" -> ") {
-                if branch == sanitized_branch {
+            if let Some((key, origin)) = line.split_once(" -> ") {
+                if key == feature_name {
                     return Ok(Some(origin.to_string()));
                 }
             }
@@ -375,12 +204,12 @@ impl WorktreeStorage {
         Ok(None)
     }
 
-    /// Removes origin information for a worktree
+    /// Removes origin information for a worktree (keyed by feature name)
     ///
     /// # Errors
     /// Returns an error if:
     /// - Failed to read or write the origin mapping file
-    pub fn remove_worktree_origin(&self, repo_name: &str, branch_name: &str) -> Result<()> {
+    pub fn remove_worktree_origin(&self, repo_name: &str, feature_name: &str) -> Result<()> {
         let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
 
         if !origin_mapping_file.exists() {
@@ -388,14 +217,13 @@ impl WorktreeStorage {
         }
 
         let content = std::fs::read_to_string(&origin_mapping_file)?;
-        let sanitized_branch = Self::sanitize_branch_name(branch_name);
 
-        // Filter out the line for this branch
+        // Filter out the line for this feature name
         let new_content: String = content
             .lines()
             .filter(|line| {
-                if let Some((branch, _)) = line.split_once(" -> ") {
-                    branch != sanitized_branch
+                if let Some((key, _)) = line.split_once(" -> ") {
+                    key != feature_name
                 } else {
                     true // Keep malformed lines
                 }
@@ -419,6 +247,19 @@ impl WorktreeStorage {
     }
 }
 
+/// Reads the current HEAD branch name of a worktree directory.
+/// Returns None if the worktree is in detached HEAD state or cannot be opened.
+#[must_use]
+pub fn read_worktree_head_branch(path: &Path) -> Option<String> {
+    let repo = git2::Repository::open(path).ok()?;
+    let head = repo.head().ok()?;
+    if head.is_branch() {
+        head.shorthand().map(ToString::to_string)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -430,141 +271,53 @@ mod tests {
         WorktreeStorage { root_dir: root }
     }
 
-    // ── sanitize_branch_name ─────────────────────────────────────────────────
+    // ── validate_feature_name ────────────────────────────────────────────────
 
     #[test]
-    fn test_sanitize_slashes() {
-        assert_eq!(
-            WorktreeStorage::sanitize_branch_name("feature/auth"),
-            "feature-auth"
-        );
+    fn test_validate_feature_name_valid() {
+        assert!(WorktreeStorage::validate_feature_name("auth").is_ok());
+        assert!(WorktreeStorage::validate_feature_name("my-feature").is_ok());
+        assert!(WorktreeStorage::validate_feature_name("feature_123").is_ok());
+        assert!(WorktreeStorage::validate_feature_name("auth-v2.0").is_ok());
     }
 
     #[test]
-    fn test_sanitize_backslash() {
-        assert_eq!(
-            WorktreeStorage::sanitize_branch_name("feature\\auth"),
-            "feature-auth"
-        );
+    fn test_validate_feature_name_slash_rejected() {
+        let result = WorktreeStorage::validate_feature_name("feature/auth");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains('/') || msg.contains("invalid character"));
     }
 
     #[test]
-    fn test_sanitize_multiple_special_chars() {
-        assert_eq!(
-            WorktreeStorage::sanitize_branch_name("a/b\\c:d*e?f\"g<h>i|j"),
-            "a-b-c-d-e-f-g-h-i-j"
-        );
+    fn test_validate_feature_name_special_chars_rejected() {
+        for ch in &['\\', ':', '*', '?', '"', '<', '>', '|'] {
+            let name = format!("feature{}auth", ch);
+            assert!(
+                WorktreeStorage::validate_feature_name(&name).is_err(),
+                "Should reject name containing '{}'",
+                ch
+            );
+        }
     }
 
     #[test]
-    fn test_sanitize_already_sanitized() {
-        assert_eq!(
-            WorktreeStorage::sanitize_branch_name("feature-auth"),
-            "feature-auth"
-        );
+    fn test_validate_feature_name_empty_rejected() {
+        assert!(WorktreeStorage::validate_feature_name("").is_err());
+        assert!(WorktreeStorage::validate_feature_name("   ").is_err());
     }
 
-    #[test]
-    fn test_sanitize_no_special_chars() {
-        assert_eq!(
-            WorktreeStorage::sanitize_branch_name("main"),
-            "main"
-        );
-    }
-
-    // ── store_branch_mapping / get_original_branch_name ─────────────────────
+    // ── get_worktree_path ────────────────────────────────────────────────────
 
     #[test]
-    fn test_branch_mapping_roundtrip() {
+    fn test_get_worktree_path_uses_feature_name_directly() {
         let tmp = TempDir::new().unwrap();
         let storage = make_storage(&tmp);
-
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
-
-        let result = storage
-            .get_original_branch_name("myrepo", "feature-auth")
-            .unwrap();
-        assert_eq!(result, Some("feature/auth".to_string()));
+        let path = storage.get_worktree_path("myrepo", "auth");
+        assert!(path.to_string_lossy().ends_with("myrepo/auth"));
     }
 
-    #[test]
-    fn test_branch_mapping_missing_returns_none() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
-
-        let result = storage
-            .get_original_branch_name("myrepo", "no-such-branch")
-            .unwrap();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_branch_mapping_no_duplicate_entries() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
-
-        // Store the same mapping twice — should not duplicate
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
-
-        let mapping_file = storage.root_dir.join("myrepo").join(".branch-mapping");
-        let content = std::fs::read_to_string(&mapping_file).unwrap();
-        let count = content
-            .lines()
-            .filter(|l| *l == "feature-auth -> feature/auth")
-            .count();
-        assert_eq!(count, 1);
-    }
-
-    // ── remove_branch_mapping ────────────────────────────────────────────────
-
-    #[test]
-    fn test_remove_branch_mapping_removes_correct_entry() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
-
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
-        storage
-            .store_branch_mapping("myrepo", "bugfix/login", "bugfix-login")
-            .unwrap();
-
-        storage
-            .remove_branch_mapping("myrepo", "feature/auth")
-            .unwrap();
-
-        // Removed entry should be gone
-        let result = storage
-            .get_original_branch_name("myrepo", "feature-auth")
-            .unwrap();
-        assert_eq!(result, None);
-
-        // Other entry should remain
-        let result = storage
-            .get_original_branch_name("myrepo", "bugfix-login")
-            .unwrap();
-        assert_eq!(result, Some("bugfix/login".to_string()));
-    }
-
-    #[test]
-    fn test_remove_branch_mapping_no_file_is_ok() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
-
-        // Should not error when there is no mapping file
-        storage
-            .remove_branch_mapping("myrepo", "feature/auth")
-            .unwrap();
-    }
-
-    // ── store_worktree_origin duplicate detection (exact line) ───────────────
+    // ── store_worktree_origin / get_worktree_origin ──────────────────────────
 
     #[test]
     fn test_store_worktree_origin_no_duplicate() {
@@ -572,77 +325,74 @@ mod tests {
         let storage = make_storage(&tmp);
 
         storage
-            .store_worktree_origin("myrepo", "feature/auth", "/home/user/repo")
+            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
             .unwrap();
         storage
-            .store_worktree_origin("myrepo", "feature/auth", "/home/user/repo")
+            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
             .unwrap();
 
         let origin_file = storage.root_dir.join("myrepo").join(".worktree-origins");
         let content = std::fs::read_to_string(&origin_file).unwrap();
         let count = content
             .lines()
-            .filter(|l| *l == "feature-auth -> /home/user/repo")
+            .filter(|l| *l == "auth -> /home/user/repo")
             .count();
         assert_eq!(count, 1);
     }
 
     #[test]
-    fn test_store_worktree_origin_substring_not_false_positive() {
-        // "feature-a" is a substring of "x-feature-a -> x-feature/a"
-        // The second store should NOT be skipped.
+    fn test_store_worktree_origin_roundtrip() {
         let tmp = TempDir::new().unwrap();
         let storage = make_storage(&tmp);
 
-        // Store entry whose text contains "feature-a" as a substring
         storage
-            .store_worktree_origin("myrepo", "x-feature/a", "/repo")
+            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
             .unwrap();
 
-        // Now store an entry for "feature-a" (different branch)
-        storage
-            .store_worktree_origin("myrepo", "feature-a", "/repo2")
-            .unwrap();
-
-        let result = storage
-            .get_worktree_origin("myrepo", "feature-a")
-            .unwrap();
-        assert_eq!(result, Some("/repo2".to_string()));
+        let result = storage.get_worktree_origin("myrepo", "auth").unwrap();
+        assert_eq!(result, Some("/home/user/repo".to_string()));
     }
 
-    // ── collision detection (Issue 1) ────────────────────────────────────────
-
     #[test]
-    fn test_branch_name_collision_is_rejected() {
+    fn test_store_worktree_origin_different_features_independent() {
         let tmp = TempDir::new().unwrap();
         let storage = make_storage(&tmp);
 
-        // Store feature/auth first
         storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
+            .store_worktree_origin("myrepo", "auth", "/repo1")
+            .unwrap();
+        storage
+            .store_worktree_origin("myrepo", "payments", "/repo2")
             .unwrap();
 
-        // Attempting to store feature-auth (same sanitized form, different original) must fail
-        let result = storage.store_branch_mapping("myrepo", "feature-auth", "feature-auth");
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("conflicts") || msg.contains("feature/auth"),
-            "unexpected error message: {msg}"
+        assert_eq!(
+            storage.get_worktree_origin("myrepo", "auth").unwrap(),
+            Some("/repo1".to_string())
+        );
+        assert_eq!(
+            storage.get_worktree_origin("myrepo", "payments").unwrap(),
+            Some("/repo2".to_string())
         );
     }
 
+    // ── list_repo_worktrees ──────────────────────────────────────────────────
+
     #[test]
-    fn test_same_branch_no_collision() {
+    fn test_list_repo_worktrees_skips_hidden_dirs() {
         let tmp = TempDir::new().unwrap();
         let storage = make_storage(&tmp);
+        let repo_dir = storage.root_dir.join("myrepo");
+        std::fs::create_dir_all(repo_dir.join("auth")).unwrap();
+        std::fs::create_dir_all(repo_dir.join("payments")).unwrap();
+        // Hidden dir should be skipped
+        std::fs::create_dir_all(repo_dir.join(".hidden")).unwrap();
+        // File should not appear (not a dir)
+        std::fs::write(repo_dir.join(".worktree-origins"), "").unwrap();
 
-        // Re-storing the exact same mapping should be fine (idempotent)
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
-        storage
-            .store_branch_mapping("myrepo", "feature/auth", "feature-auth")
-            .unwrap();
+        let worktrees = storage.list_repo_worktrees("myrepo").unwrap();
+        assert!(worktrees.contains(&"auth".to_string()));
+        assert!(worktrees.contains(&"payments".to_string()));
+        assert!(!worktrees.contains(&".hidden".to_string()));
+        assert_eq!(worktrees.len(), 2);
     }
 }

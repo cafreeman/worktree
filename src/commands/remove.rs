@@ -4,27 +4,23 @@ use std::path::PathBuf;
 
 use crate::git::GitRepo;
 use crate::selection::{RealSelectionProvider, SelectionProvider};
-use crate::storage::WorktreeStorage;
+use crate::storage::{WorktreeStorage, read_worktree_head_branch};
 
-/// Removes a worktree and forcefully deletes the associated branch by default
+/// Removes a worktree, preserving branches by default
 ///
 /// # Errors
-/// Returns an error if:
-/// - The target worktree doesn't exist
-/// - Failed to access storage system
-/// - Git operations fail
-/// - Failed to remove worktree directory
-/// - Interactive selection fails
+/// Returns an error if the target worktree doesn't exist, storage access fails,
+/// git operations fail, or the worktree directory cannot be removed.
 pub fn remove_worktree(
     target: Option<&str>,
-    preserve_branch: bool,
+    delete_branch: bool,
     interactive: bool,
     list_completions: bool,
     current_repo_only: bool,
 ) -> Result<()> {
     remove_worktree_with_provider(
         target,
-        preserve_branch,
+        delete_branch,
         interactive,
         list_completions,
         current_repo_only,
@@ -35,15 +31,11 @@ pub fn remove_worktree(
 /// Removes a worktree with a custom selection provider (for testing)
 ///
 /// # Errors
-/// Returns an error if:
-/// - The target worktree doesn't exist
-/// - Failed to access storage system
-/// - Git operations fail
-/// - Failed to remove worktree directory
-/// - Interactive selection fails
+/// Returns an error if the target worktree doesn't exist, storage access fails,
+/// git operations fail, or the worktree directory cannot be removed.
 pub fn remove_worktree_with_provider(
     target: Option<&str>,
-    preserve_branch: bool,
+    delete_branch: bool,
     interactive: bool,
     list_completions: bool,
     current_repo_only: bool,
@@ -61,7 +53,7 @@ pub fn remove_worktree_with_provider(
     let repo_path = git_repo.get_repo_path();
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
-    let (worktree_path, branch_name) = if interactive || target.is_none() {
+    let (worktree_path, feature_name) = if interactive || target.is_none() {
         select_worktree_for_removal(&storage, current_repo_only, provider)?
     } else if let Some(target_str) = target {
         resolve_target(target_str, &storage, &repo_name)?
@@ -73,55 +65,18 @@ pub fn remove_worktree_with_provider(
         anyhow::bail!("Worktree path does not exist: {}", worktree_path.display());
     }
 
-    println!("Removing worktree: {}", worktree_path.display());
-    println!("Branch: {}", branch_name);
+    println!("Removing worktree '{}': {}", feature_name, worktree_path.display());
 
-    // Resolve canonical branch name from the worktree HEAD before pruning
-    let resolved_branch_name = match resolve_branch_from_worktree_head(&worktree_path) {
-        Ok(b) => {
-            if b != branch_name {
-                println!("Resolved branch from HEAD: {} (was: {})", b, branch_name);
-            }
-            b
-        }
-        Err(e) => {
-            println!(
-                "⚠ Warning: Could not resolve branch from HEAD ({}). Attempting to use branch mapping...",
-                e
-            );
-            // Try to use storage mapping based on sanitized directory name
-            let sanitized = worktree_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(&branch_name);
-            match storage.get_original_branch_name(&repo_name, sanitized) {
-                Ok(Some(original)) => {
-                    if original != branch_name {
-                        println!(
-                            "Resolved branch from mapping: {} (was: {})",
-                            original, branch_name
-                        );
-                    }
-                    original
-                }
-                _ => {
-                    println!(
-                        "⚠ Warning: Branch mapping not found. Using provided value: {}",
-                        branch_name
-                    );
-                    branch_name.clone()
-                }
-            }
-        }
-    };
+    // Read current branch from worktree HEAD before removing it
+    let current_branch = read_worktree_head_branch(&worktree_path);
 
-    // Use the directory name (sanitized) as the worktree name for git
+    // Use the feature name (directory name) as the worktree name for git
     let worktree_name = worktree_path
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or(&branch_name);
+        .unwrap_or(&feature_name);
 
-    // Remove the filesystem directory first so prune can delete git metadata cleanly
+    // Remove the filesystem directory first
     if worktree_path.exists() {
         fs::remove_dir_all(&worktree_path).context("Failed to remove worktree directory")?;
     }
@@ -131,27 +86,23 @@ pub fn remove_worktree_with_provider(
         .context("Failed to remove worktree from git")?;
 
     // Clean up origin information
-    if let Err(e) = storage.remove_worktree_origin(&repo_name, &resolved_branch_name) {
+    if let Err(e) = storage.remove_worktree_origin(&repo_name, &feature_name) {
         println!("⚠ Warning: Failed to clean up origin information: {}", e);
     }
 
-    // By default, force delete the branch unless --preserve-branch is specified
-    if !preserve_branch {
-        println!("Deleting branch: {}", resolved_branch_name);
-        match git_repo.delete_branch(&resolved_branch_name) {
-            Ok(_) => {
-                println!("✓ Branch deleted successfully");
-                // Unmark managed status
-                storage.unmark_branch_managed(&repo_name, &resolved_branch_name);
-                // Remove mapping for this branch
-                if let Err(e) = storage.remove_branch_mapping(&repo_name, &resolved_branch_name) {
-                    println!("⚠ Warning: Failed to remove branch mapping: {}", e);
-                }
+    // Delete branch only when explicitly requested via --delete-branch
+    if delete_branch {
+        if let Some(branch) = &current_branch {
+            println!("Deleting branch: {}", branch);
+            match git_repo.delete_branch(branch) {
+                Ok(_) => println!("✓ Branch deleted successfully"),
+                Err(e) => println!("⚠ Warning: Failed to delete branch: {}", e),
             }
-            Err(e) => println!("⚠ Warning: Failed to delete branch: {}", e),
+        } else {
+            println!("⚠ Warning: Could not determine branch to delete (detached HEAD or error)");
         }
-    } else {
-        println!("Branch '{}' preserved (not deleted)", resolved_branch_name);
+    } else if let Some(branch) = &current_branch {
+        println!("Branch '{}' preserved (use --delete-branch to remove it)", branch);
     }
 
     println!("✓ Worktree removed successfully!");
@@ -159,116 +110,43 @@ pub fn remove_worktree_with_provider(
     Ok(())
 }
 
-fn resolve_branch_from_worktree_head(worktree_path: &std::path::Path) -> Result<String> {
-    let repo = git2::Repository::open(worktree_path)?;
-    let head = repo.head()?;
-    if head.is_branch() {
-        if let Some(name) = head.shorthand() {
-            return Ok(name.to_string());
-        }
-        if let Some(name) = head.name() {
-            const HEADS: &str = "refs/heads/";
-            if let Some(stripped) = name.strip_prefix(HEADS) {
-                return Ok(stripped.to_string());
-            }
-        }
-    }
-    anyhow::bail!("Could not resolve branch from HEAD (detached or invalid)")
-}
-
 fn resolve_target(
     target: &str,
     storage: &WorktreeStorage,
     repo_name: &str,
-) -> Result<(std::path::PathBuf, String)> {
-    use std::path::Path;
-
-    // Check if target is an absolute path
-    let target_path = Path::new(target);
-    if target_path.is_absolute() {
-        // Verify this is a valid worktree path within our storage structure
-        let storage_root = storage.get_repo_storage_dir(repo_name);
-        if let Ok(relative_path) = target_path.strip_prefix(&storage_root) {
-            if let Some(branch_dir) = relative_path.file_name() {
-                if let Some(sanitized_name) = branch_dir.to_str() {
-                    // Try to get the original branch name from the sanitized name
-                    if let Some(original_branch) =
-                        storage.get_original_branch_name(repo_name, sanitized_name)?
-                    {
-                        return Ok((target_path.to_path_buf(), original_branch));
-                    } else {
-                        // If no mapping exists, the sanitized name might be the original
-                        return Ok((target_path.to_path_buf(), sanitized_name.to_string()));
-                    }
-                }
-            }
-        }
-        anyhow::bail!("Invalid worktree path: {}", target);
-    }
-
-    // Helper function to check if target contains characters that would be sanitized
-    let contains_special_chars = |s: &str| {
-        s.chars()
-            .any(|c| matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
-    };
-
-    // If target contains special characters, it's likely a canonical branch name
-    if contains_special_chars(target) {
-        let worktree_path = storage.get_worktree_path(repo_name, target);
-        if worktree_path.exists() {
-            return Ok((worktree_path, target.to_string()));
-        }
-        anyhow::bail!("No worktree found for branch '{}'", target);
-    }
-
-    // Target doesn't contain special chars - it could be either canonical or sanitized
-    // Try as canonical first
+) -> Result<(PathBuf, String)> {
+    // Match by feature name (directory name) directly
     let worktree_path = storage.get_worktree_path(repo_name, target);
     if worktree_path.exists() {
-        // Check if there's a mapping that shows this is actually a sanitized name
-        if let Some(original_branch) = storage.get_original_branch_name(repo_name, target)? {
-            // Target is sanitized, return the original branch name
-            return Ok((worktree_path, original_branch));
-        }
+        return Ok((worktree_path, target.to_string()));
+    }
 
-        // No mapping found - check if the branch actually exists in git
-        // If git has a branch with this exact name, then target is canonical
-        let current_dir = std::env::current_dir()?;
-        if let Ok(git_repo) = crate::git::GitRepo::open(&current_dir) {
-            if let Ok(branches) = git_repo.list_local_branches() {
-                if branches.contains(&target.to_string()) {
-                    // Git has a branch with this exact name, so target is canonical
-                    return Ok((worktree_path, target.to_string()));
-                }
+    // Try partial match against known worktrees
+    let known = storage.list_repo_worktrees(repo_name)?;
+    let matches: Vec<&String> = known.iter().filter(|name| name.contains(target)).collect();
+
+    match matches.len() {
+        0 => anyhow::bail!("No worktree found matching '{}'", target),
+        1 => {
+            let feature_name = matches[0].clone();
+            let path = storage.get_worktree_path(repo_name, &feature_name);
+            Ok((path, feature_name))
+        }
+        _ => {
+            eprintln!("Multiple worktrees match '{}'. Please be more specific:", target);
+            for name in &matches {
+                eprintln!("  {}", name);
             }
-        }
-
-        // Git doesn't have a branch with this name, so target is likely sanitized
-        // but we can't resolve it without the mapping - error out for safety
-        anyhow::bail!(
-            "Cannot determine canonical branch name for '{}'. The branch mapping file may be missing or corrupted. \
-             Please specify the full branch name (e.g., 'feature/branch-name' instead of 'feature-branch-name')",
-            target
-        );
-    }
-
-    // Target doesn't exist as canonical, try as sanitized with mapping lookup
-    if let Some(original_branch) = storage.get_original_branch_name(repo_name, target)? {
-        let path = storage.get_worktree_path(repo_name, &original_branch);
-        if path.exists() {
-            return Ok((path, original_branch));
+            anyhow::bail!("Ambiguous worktree name '{}'", target);
         }
     }
-
-    anyhow::bail!("No worktree found matching '{}'", target);
 }
 
 fn list_worktree_completions(storage: &WorktreeStorage, current_repo_only: bool) -> Result<()> {
     let worktrees = get_available_worktrees(storage, current_repo_only)?;
 
-    for (_, branch, _) in worktrees {
-        // For completions, we want the original branch name
-        println!("{}", branch);
+    for (_, feature_name, _) in worktrees {
+        println!("{}", feature_name);
     }
 
     Ok(())
@@ -285,23 +163,26 @@ fn select_worktree_for_removal(
         anyhow::bail!("No worktrees found");
     }
 
-    // Format for display: "repo/branch (path)"
+    // Format: "feature-name (current-branch)  /path"
     let options: Vec<String> = worktrees
         .iter()
-        .map(|(repo, branch, path)| format!("{}/{} ({})", repo, branch, path.display()))
+        .map(|(repo, feature_name, path)| {
+            let branch_info = read_worktree_head_branch(path)
+                .map(|b| format!(" ({})", b))
+                .unwrap_or_default();
+            format!("{}/{}{} ({})", repo, feature_name, branch_info, path.display())
+        })
         .collect();
 
     let selection = provider.select("Select worktree to remove:", options.clone())?;
 
-    // Find the index of the selected option and use it to look up path and branch directly,
-    // avoiding any string parsing that would break on paths containing " (".
     let index = options
         .iter()
         .position(|o| o == &selection)
         .ok_or_else(|| anyhow::anyhow!("Selected option not found in list"))?;
 
-    let (_, branch, path) = &worktrees[index];
-    Ok((path.clone(), branch.clone()))
+    let (_, feature_name, path) = &worktrees[index];
+    Ok((path.clone(), feature_name.clone()))
 }
 
 fn get_available_worktrees(
@@ -317,30 +198,20 @@ fn get_available_worktrees(
             let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
             let repo_worktrees = storage.list_repo_worktrees(&repo_name)?;
-            for worktree in repo_worktrees {
-                let worktree_path = storage.get_worktree_path(&repo_name, &worktree);
+            for feature_name in repo_worktrees {
+                let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
                 if worktree_path.exists() {
-                    // Get original branch name or fall back to sanitized
-                    let display_name = storage
-                        .get_original_branch_name(&repo_name, &worktree)?
-                        .unwrap_or_else(|| worktree.clone());
-
-                    worktrees.push((repo_name.clone(), display_name, worktree_path));
+                    worktrees.push((repo_name.clone(), feature_name, worktree_path));
                 }
             }
         }
     } else {
         let all_worktrees = storage.list_all_worktrees()?;
         for (repo_name, repo_worktrees) in all_worktrees {
-            for worktree in repo_worktrees {
-                let worktree_path = storage.get_worktree_path(&repo_name, &worktree);
+            for feature_name in repo_worktrees {
+                let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
                 if worktree_path.exists() {
-                    // Get original branch name or fall back to sanitized
-                    let display_name = storage
-                        .get_original_branch_name(&repo_name, &worktree)?
-                        .unwrap_or_else(|| worktree.clone());
-
-                    worktrees.push((repo_name.clone(), display_name, worktree_path));
+                    worktrees.push((repo_name.clone(), feature_name, worktree_path));
                 }
             }
         }

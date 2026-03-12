@@ -47,7 +47,7 @@ fn test_back_requires_worktree_context() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree for completeness but test error from repo root
-    env.run_command(&["create", "feature/test-context"])?
+    env.run_command(&["create", "test-context", "feature/test-context"])?
         .assert()
         .success();
 

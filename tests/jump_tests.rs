@@ -23,35 +23,35 @@ fn get_stdout(env: &CliTestEnvironment, args: &[&str]) -> Result<String> {
 fn test_jump_path_output() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create a worktree
-    env.run_command(&["create", "feature/path-test"])?
+    // Create a worktree with feature name "path-test" on branch "feature/path-test"
+    env.run_command(&["create", "path-test", "feature/path-test"])?
         .assert()
         .success();
 
-    // Verify worktree exists
-    let worktree_path = env.worktree_path("feature/path-test");
+    // Verify worktree exists at feature name path
+    let worktree_path = env.worktree_path("path-test");
     worktree_path.assert(predicate::path::is_dir());
 
-    // Test jump command outputs the correct path
-    let output_path = get_stdout(&env, &["jump", "feature/path-test"])?;
+    // Test jump command outputs the correct path using feature name
+    let output_path = get_stdout(&env, &["jump", "path-test"])?;
     assert_eq!(output_path.trim(), worktree_path.to_string_lossy());
 
     Ok(())
 }
 
-/// Test jump command with partial branch name matching
+/// Test jump command with partial feature name matching
 #[test]
 fn test_jump_partial_matching() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create a worktree with unique name
-    env.run_command(&["create", "feature/unique-identifier"])?
+    // Create a worktree with unique feature name
+    env.run_command(&["create", "unique-identifier", "feature/unique-identifier"])?
         .assert()
         .success();
 
     // Jump with partial match should work
     let output_path = get_stdout(&env, &["jump", "unique"])?;
-    let expected_path = env.worktree_path("feature/unique-identifier");
+    let expected_path = env.worktree_path("unique-identifier");
     assert_eq!(output_path.trim(), expected_path.to_string_lossy());
 
     Ok(())
@@ -62,12 +62,12 @@ fn test_jump_partial_matching() -> Result<()> {
 fn test_jump_ambiguous_match() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create multiple worktrees with similar names
-    env.run_command(&["create", "feature/test-alpha"])?
+    // Create multiple worktrees with similar feature names
+    env.run_command(&["create", "test-alpha", "feature/test-alpha"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/test-beta"])?
+    env.run_command(&["create", "test-beta", "feature/test-beta"])?
         .assert()
         .success();
 
@@ -76,8 +76,8 @@ fn test_jump_ambiguous_match() -> Result<()> {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Ambiguous worktree name"))
-        .stderr(predicate::str::contains("feature/test-alpha"))
-        .stderr(predicate::str::contains("feature/test-beta"));
+        .stderr(predicate::str::contains("test-alpha"))
+        .stderr(predicate::str::contains("test-beta"));
 
     Ok(())
 }
@@ -96,26 +96,25 @@ fn test_jump_nonexistent_worktree() -> Result<()> {
     Ok(())
 }
 
-/// Test completion mode lists available worktrees
+/// Test completion mode lists available worktrees by feature name
 #[test]
 fn test_jump_list_completions() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create some worktrees
-    env.run_command(&["create", "feature/completion1"])?
+    env.run_command(&["create", "completion1", "feature/completion1"])?
         .assert()
         .success();
 
-    env.run_command(&["create", "feature/completion2"])?
+    env.run_command(&["create", "completion2", "feature/completion2"])?
         .assert()
         .success();
 
-    // Test completion listing
+    // Test completion listing — should show feature names
     let stdout = get_stdout(&env, &["jump", "--list-completions"])?;
 
-    // Should list available worktrees for completion
-    assert!(stdout.contains("feature/completion1"));
-    assert!(stdout.contains("feature/completion2"));
+    assert!(stdout.contains("completion1"));
+    assert!(stdout.contains("completion2"));
 
     Ok(())
 }
@@ -126,13 +125,13 @@ fn test_jump_completions_current_repo_only() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
-    env.run_command(&["create", "feature/current-test"])?
+    env.run_command(&["create", "current-test", "feature/current-test"])?
         .assert()
         .success();
 
     // Test completion with current repo filter
     let stdout = get_stdout(&env, &["jump", "--list-completions", "--current"])?;
-    assert!(stdout.contains("feature/current-test"));
+    assert!(stdout.contains("current-test"));
 
     Ok(())
 }
@@ -150,19 +149,19 @@ fn test_jump_completions_empty() -> Result<()> {
     Ok(())
 }
 
-/// Test jump command with sanitized branch names
+/// Test jump with feature names (no slash in feature name)
 #[test]
-fn test_jump_with_sanitized_names() -> Result<()> {
+fn test_jump_with_feature_names() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create worktree with special characters
-    env.run_command(&["create", "feature/test-branch"])?
+    // Create worktree with feature name (branch can have slash, feature name cannot)
+    env.run_command(&["create", "test-branch", "feature/test-branch"])?
         .assert()
         .success();
 
-    // Should be able to jump using original branch name
-    let output_path = get_stdout(&env, &["jump", "feature/test-branch"])?;
-    let expected_path = env.worktree_path("feature/test-branch");
+    // Should be able to jump using feature name
+    let output_path = get_stdout(&env, &["jump", "test-branch"])?;
+    let expected_path = env.worktree_path("test-branch");
     assert_eq!(output_path.trim(), expected_path.to_string_lossy());
 
     Ok(())
@@ -182,43 +181,44 @@ fn test_jump_interactive_no_worktrees() -> Result<()> {
     Ok(())
 }
 
-// TODO: Future interactive tests when jump supports true interactive mode
-// These would test the actual interactive selection menu
-
 /// Test current repository filtering functionality
 #[test]
 fn test_jump_current_repo_filtering() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create a worktree in current repo
-    env.run_command(&["create", "feature/current-filter"])?
+    env.run_command(&["create", "current-filter", "feature/current-filter"])?
         .assert()
         .success();
 
     // Jump with current repo only should work
-    let output_path = get_stdout(&env, &["jump", "feature/current-filter", "--current"])?;
-    let expected_path = env.worktree_path("feature/current-filter");
+    let output_path = get_stdout(&env, &["jump", "current-filter", "--current"])?;
+    let expected_path = env.worktree_path("current-filter");
     assert_eq!(output_path.trim(), expected_path.to_string_lossy());
 
     Ok(())
 }
 
-/// Test jumping between multiple worktrees by name
+/// Test jumping between multiple worktrees by feature name
 #[test]
 fn test_jump_multiple_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Create multiple worktrees
-    let worktrees = ["feature/auth", "feature/payments", "bugfix/critical"];
+    // Create multiple worktrees using feature-name + branch pairs
+    let worktrees = [
+        ("auth", "feature/auth"),
+        ("payments", "feature/payments"),
+        ("critical", "bugfix/critical"),
+    ];
 
-    for worktree in &worktrees {
-        env.run_command(&["create", worktree])?.assert().success();
+    for (feature, branch) in &worktrees {
+        env.run_command(&["create", feature, branch])?.assert().success();
     }
 
-    // Test jumping to each one specifically
-    for worktree in &worktrees {
-        let output_path = get_stdout(&env, &["jump", worktree])?;
-        let expected_path = env.worktree_path(worktree);
+    // Test jumping to each one by feature name
+    for (feature, _) in &worktrees {
+        let output_path = get_stdout(&env, &["jump", feature])?;
+        let expected_path = env.worktree_path(feature);
         assert_eq!(output_path.trim(), expected_path.to_string_lossy());
     }
 
