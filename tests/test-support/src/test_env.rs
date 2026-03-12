@@ -89,14 +89,16 @@ impl CliTestEnvironment {
         self.storage_dir.child("test_repo").child(&sanitized)
     }
     
-    /// Check if we're running in a CI environment (where TTY is not available)
+    /// Check if we're running in a CI environment or without a TTY (where interactive input is not available)
     pub fn is_ci() -> bool {
-        // Check for common CI environment variables
-        std::env::var("CI").is_ok() || 
-        std::env::var("GITHUB_ACTIONS").is_ok() ||
-        std::env::var("GITLAB_CI").is_ok() ||
-        std::env::var("TRAVIS").is_ok() ||
-        std::env::var("CIRCLECI").is_ok()
+        use std::io::IsTerminal;
+        // Check for common CI environment variables or absence of a TTY
+        std::env::var("CI").is_ok()
+            || std::env::var("GITHUB_ACTIONS").is_ok()
+            || std::env::var("GITLAB_CI").is_ok()
+            || std::env::var("TRAVIS").is_ok()
+            || std::env::var("CIRCLECI").is_ok()
+            || !std::io::stdin().is_terminal()
     }
 }
 
