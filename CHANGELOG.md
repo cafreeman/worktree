@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-12
+
+### Added
+
+- **`[symlink-patterns]` config section:** Files matching these patterns are symlinked into new worktrees instead of copied. Edits in any worktree immediately affect the shared file — ideal for `.env` or shared scripts.
+- **`[on-create]` config section:** Shell commands run after each worktree is created (via `sh -c`). Supports shell operators, pipes, and redirects. A failing command prints a warning and skips remaining hooks but does not abort worktree creation.
+- **`--from <ref>` flag on `create`:** Creates the new branch starting from a specified branch, tag, or commit hash.
+- **`--interactive-from` flag on `create`:** Opens an interactive git reference picker for the `--from` starting point.
+
+### Changed
+
+- **BREAKING: Feature-named worktrees.** Worktrees are now identified by a user-supplied **feature name** (e.g. `auth`, `payment-system`) rather than the branch name. The feature name is the directory name and is independent of the branch checked out inside:
+  - `create` signature is now `create <feature-name> [branch]`
+  - `jump`, `switch`, `remove`, `list`, completions — all use feature names
+  - Storage layout is now `~/.worktrees/<repo>/<feature-name>/`
+- **BREAKING: `remove` preserves branches by default.** Branches are no longer deleted when a worktree is removed unless `--delete-branch` is passed. The old `--keep-branch` / `--force-delete-branch` flags are removed.
+- **Smart branch mode is now the only mode.** `create` creates the branch if it doesn't exist or reuses it if it does. The `--new-branch` and `--existing-branch` flags are removed.
+
+### Removed
+
+- `--new-branch` and `--existing-branch` flags on `create`
+- `--keep-branch` and `--force-delete-branch` flags on `remove`
+- Branch name sanitization (`feature/auth` → `feature-auth`) — no longer needed since the directory name is the feature name, not the branch name
+- `.branch-mapping` metadata files
+- `.managed-branches/` directory and managed-branch tracking
+
 ## [0.4.0] - 2025-09-22
 
 ### Enhanced
@@ -204,7 +230,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper cleanup of git references and filesystem state
   - Cross-platform path handling and symlink resolution
 
-[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/cafreeman/worktree/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/cafreeman/worktree/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/cafreeman/worktree/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/cafreeman/worktree/compare/v0.3.0...v0.3.1

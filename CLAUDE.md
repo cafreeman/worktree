@@ -52,30 +52,30 @@ cargo run -- <command>
 ### Module Structure
 - **main.rs**: CLI entry point using clap for argument parsing, dispatches to command modules
 - **lib.rs**: Library crate root, exposes all modules and the main `Result` type from anyhow
-- **commands/**: Individual command implementations (create, list, remove, status, sync_config, init, jump, back)
-- **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<branch>/` with branch name sanitization, mapping, and origin tracking
-- **config/**: Handles `.worktree-config.toml` files for customizing file copy patterns
+- **commands/**: Individual command implementations (create, list, remove, status, sync_config, init, jump, back, cleanup)
+- **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<feature-name>/` with feature name validation and origin tracking
+- **config/**: Handles `.worktree-config.toml` files for customizing copy patterns, symlink patterns, and on-create hooks
 - **git/**: Git operations wrapper using git2 crate, implements GitOperations trait
 - **traits.rs**: Defines GitOperations trait for testability and abstraction
 
 ### Key Design Patterns
 - **Trait-based abstraction**: GitOperations trait enables mocking for tests
 - **Centralized storage**: All worktrees stored under `~/.worktrees/` with predictable structure (no custom paths)
-- **Branch name sanitization**: Converts `feature/auth` to `feature-auth` for filesystem compatibility, maintains mapping
-- **Configuration-driven file copying**: Uses glob patterns from `.worktree-config.toml` or sensible defaults
+- **Feature-name-as-identity**: Worktrees are identified by a user-supplied feature name (the directory name), decoupled from the branch name. No branch name sanitization or mapping is performed.
+- **Configuration-driven file management**: Uses glob patterns from `.worktree-config.toml` for copying, symlinking, and post-create hooks; falls back to sensible defaults
 - **Origin tracking**: Stores origin repository paths for back navigation in `.worktree-origins` metadata files
 - **Shell integration**: Generates shell functions for directory navigation and completions
 
 ### Core Components
-- **WorktreeStorage**: Manages the `~/.worktrees/` directory structure, branch name mapping, and origin tracking
-- **WorktreeConfig**: Loads and manages copy patterns from `.worktree-config.toml`
+- **WorktreeStorage**: Manages the `~/.worktrees/` directory structure, feature name validation, and origin tracking
+- **WorktreeConfig**: Loads and manages copy patterns, symlink patterns, and on-create hooks from `.worktree-config.toml`
 - **GitRepo**: Wraps git2 operations for worktree management
 - **Shell Integration**: Generates bash/zsh/fish functions for `worktree` command wrapper with `jump` and `back` navigation
 
 ### Testing
 - Unit tests in `tests/` directory with comprehensive coverage
-- Uses `tempfile` and `temp-env` for isolated test environments
-- Test helpers in `test_helpers.rs` for common setup
+- Uses `assert_fs`, `assert_cmd`, and `temp-env` for isolated test environments
+- Test helpers in `tests/test-support/` crate for common setup
 
 ### Clippy Configuration
 Strict linting is enforced with:

@@ -88,13 +88,13 @@ use test_support::CliTestEnvironment;
 fn test_feature() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Setup
-    env.run_command(&["create", "feature/test"])?
+    // Create worktree with feature name "myfeature" on branch "feature/test"
+    env.run_command(&["create", "myfeature", "feature/test"])?
         .assert()
         .success();
 
-    // Assertions
-    env.worktree_path("feature/test")
+    // worktree_path takes the feature name
+    env.worktree_path("myfeature")
         .assert(predicate::path::is_dir());
 
     Ok(())
@@ -125,13 +125,13 @@ fn test_with_config() -> Result<()> {
     // Create sample files
     create_sample_config_files(&env.repo_dir)?;
 
-    // Create worktree
-    env.run_command(&["create", "feature/config-test"])?
+    // Create worktree with feature name "config-test" on branch "feature/config-test"
+    env.run_command(&["create", "config-test", "feature/config-test"])?
         .assert()
         .success();
 
     // Verify config files were copied
-    let worktree_path = env.worktree_path("feature/config-test");
+    let worktree_path = env.worktree_path("config-test");
     assert_config_files_copied(&worktree_path)?;
 
     Ok(())
@@ -146,11 +146,11 @@ fn test_error_handling() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Pre-create directory to trigger error
-    let worktree_path = env.worktree_path("feature/existing");
+    let worktree_path = env.worktree_path("existing");
     worktree_path.create_dir_all()?;
 
-    // Attempt to create worktree - should fail
-    env.run_command(&["create", "feature/existing"])?
+    // Attempt to create worktree with same feature name - should fail
+    env.run_command(&["create", "existing", "feature/existing"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("already exists"));

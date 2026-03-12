@@ -4,12 +4,14 @@ A powerful CLI tool for managing git worktrees with enhanced features that simpl
 
 ## What is `worktree`?
 
-`worktree` solves the common problem of needing to work on multiple git branches simultaneously. Instead of constantly switching branches and losing your work context, `worktree` creates separate working directories for each branch while sharing the same git history.
+`worktree` solves the common problem of needing to work on multiple git branches simultaneously. Instead of constantly switching branches and losing your work context, `worktree` creates separate working directories for each feature while sharing the same git history.
+
+Each worktree is identified by a **feature name** — a short, memorable label you choose (e.g. `auth`, `payment-system`). The feature name becomes the directory name and is independent of the branch name, so you can rename branches or reuse worktrees without losing your layout.
 
 **Key Benefits:**
 
-- **Organized Storage** - Keeps all worktrees in `~/.worktrees/<repo-name>/<branch-name>/`
-- **Smart Config Management** - Automatically copies important config files (`.env`, `.vscode`, etc.) to new worktrees
+- **Organized Storage** - Keeps all worktrees in `~/.worktrees/<repo-name>/<feature-name>/`
+- **Smart Config Management** - Automatically copies or symlinks important config files (`.env`, `.vscode`, etc.) to new worktrees
 - **Seamless Navigation** - Jump between worktrees instantly with interactive selection
 - **Perfect for LLM Workflows** - Work on multiple features simultaneously without losing context
 
@@ -50,17 +52,17 @@ worktree-bin init fish | source
 
 ## Commands
 
-| Command                   | Description                                               |
-| ------------------------- | --------------------------------------------------------- |
-| `create <branch>`         | Create a new worktree for the specified branch            |
-| `list`                    | List all worktrees across all repositories                |
-| `jump [branch]`           | Switch to a worktree (interactive if no branch specified) |
-| `switch [branch]`         | Alias for `jump` - switch to a worktree                   |
-| `remove [branch]`         | Remove a worktree (interactive if no branch specified)    |
-| `status`                  | Show detailed status of current worktree and branches     |
-| `sync-config <from> <to>` | Copy config files between worktrees                       |
-| `back`                    | Return to the original repository                         |
-| `cleanup`                 | Clean up orphaned worktree references                     |
+| Command                        | Description                                                    |
+| ------------------------------ | -------------------------------------------------------------- |
+| `create <feature-name> [branch]` | Create a new worktree with the given feature name            |
+| `list`                         | List all worktrees across all repositories                     |
+| `jump [feature-name]`          | Switch to a worktree (interactive if no name specified)        |
+| `switch [feature-name]`        | Alias for `jump`                                               |
+| `remove [feature-name]`        | Remove a worktree (interactive if no name specified)           |
+| `status`                       | Show detailed status of current worktree and branches          |
+| `sync-config <from> <to>`      | Copy config files between worktrees                            |
+| `back`                         | Return to the original repository                              |
+| `cleanup`                      | Clean up orphaned worktree references                          |
 
 ## Interactive Features
 
@@ -76,7 +78,8 @@ worktree-bin init fish | source
 The shell integration provides intelligent autocomplete:
 
 - Command and flag completion for all subcommands
-- Worktree name completion for `jump` and `remove`
+- Feature name completion for `jump`, `switch`, and `remove`
+- Git reference completion for the `--from` flag on `create`
 - Context-aware suggestions based on current repository
 
 ## Typical Workflow
@@ -86,24 +89,30 @@ The shell integration provides intelligent autocomplete:
 ### 1. Create Worktrees for Different Tasks
 
 ```bash
-# Create worktrees for different features
-worktree create feature/user-auth
-worktree create feature/payment-system
-worktree create bugfix/security-patch
+# Create a worktree named "auth" on branch feature/user-auth
+worktree create auth feature/user-auth
+
+# Create a worktree named "payments" on branch feature/payment-system
+worktree create payments feature/payment-system
+
+# Create a worktree named "security" branching from a specific point
+worktree create security bugfix/security-patch --from main
 ```
+
+If the branch already exists it will be reused; if it doesn't exist it will be created.
 
 ### 2. Jump Between Contexts
 
 ```bash
 # Switch to auth feature (using jump or switch alias)
-worktree jump feature/user-auth
+worktree jump auth
 # or
-worktree switch feature/user-auth
+worktree switch auth
 
 # Work with your LLM assistant on authentication...
 
 # Quickly switch to payment feature
-worktree switch feature/payment-system
+worktree switch payments
 
 # Work on payment system while auth context is preserved...
 ```
@@ -115,18 +124,14 @@ worktree switch feature/payment-system
 worktree list
 worktree status
 
-# Sync config changes between worktrees
-worktree sync-config feature/user-auth feature/payment-system
+# Sync config changes from one worktree to another
+worktree sync-config auth payments
 
-# Clean up completed features
-# By default, branch will be deleted only if it was created by this CLI
-worktree remove feature/user-auth
+# Remove a worktree — branch is preserved by default
+worktree remove security
 
-# To keep the branch
-worktree remove feature/user-auth --keep-branch
-
-# To force-delete an unmanaged branch (e.g., created outside this CLI)
-worktree remove feature/user-auth --force-delete-branch
+# Remove and also delete the branch
+worktree remove auth --delete-branch
 
 # Return to main repo
 worktree back
@@ -141,32 +146,28 @@ worktree back
 
 ## Storage Organization
 
-`worktree` organizes all worktrees in a centralized location:
+`worktree` organizes all worktrees in a centralized location keyed by feature name:
 
 ```
 ~/.worktrees/
 ├── my-project/
-│   ├── main/
-│   ├── feature-auth/
-│   └── bugfix-security-patch/
+│   ├── auth/
+│   ├── payments/
+│   └── security/
 └── another-project/
     ├── main/
-    └── feature-api/
+    └── api-v2/
 ```
 
-### Branch Name Sanitization
-
-Branch names with special characters are automatically sanitized for filesystem safety:
-
-- `feature/user-auth` → `feature-user-auth`
-- `hotfix/security:patch` → `hotfix-security-patch`
-- Original branch names are preserved and mapped back correctly
+The directory name is always the feature name you provided — independent of the branch name checked out inside.
 
 ## Configuration
 
-Create a `.worktree-config.toml` in your repository root to customize which files are copied to new worktrees. The configuration system is flexible and supports partial configurations that merge with sensible defaults.
+Create a `.worktree-config.toml` in your repository root to customize which files are copied or symlinked to new worktrees.
 
-### Basic Configuration
+### Copy Patterns
+
+Files matching these patterns are copied into each new worktree:
 
 ```toml
 [copy-patterns]
@@ -183,9 +184,31 @@ exclude = [
     "target/",
     ".git/",
     "*.log",
-    "*.tmp",
-    "dist/",
-    "build/"
+    "*.tmp"
+]
+```
+
+### Symlink Patterns
+
+Files matching these patterns are symlinked into each new worktree instead of copied. Edits in any worktree immediately affect the origin file — useful for secrets or shared tooling you never want to duplicate:
+
+```toml
+[symlink-patterns]
+include = [
+    ".env",
+    "scripts/"
+]
+```
+
+### Post-Create Hooks
+
+Shell commands to run after a worktree is created. Commands run in the new worktree directory via `sh -c`. A failing command prints a warning and skips remaining hooks, but the worktree is still created:
+
+```toml
+[on-create]
+commands = [
+    "npm install",
+    "cp .env.example .env.local"
 ]
 ```
 
@@ -197,37 +220,15 @@ You can specify only the patterns you want to customize. Your configuration merg
 # Add custom includes (merges with defaults)
 [copy-patterns]
 include = ["mise.toml", "docker-compose.yml"]
-# Result: Default includes + custom includes + default excludes
-```
-
-```toml
-# Add custom excludes (merges with defaults)
-[copy-patterns]
-exclude = ["*.secret", "private/"]
-# Result: Default includes + default excludes + custom excludes
-```
-
-### Precedence Rules
-
-Your configuration wins when there are conflicts:
-
-```toml
-# Include something normally excluded by default
-[copy-patterns]
-include = ["node_modules/.cache"]
-# Result: Default includes + node_modules/.cache + default excludes
-# (node_modules/.cache gets included despite node_modules/ being excluded)
 ```
 
 ```toml
 # Exclude something normally included by default
 [copy-patterns]
 exclude = [".vscode/"]
-# Result: Default includes + default excludes + .vscode/
-# (.vscode/ gets excluded despite being included by default)
 ```
 
-This approach is simple and intuitive - your choices always override the defaults when there's a conflict.
+Your choices always override the defaults when there's a conflict.
 
 ### Default Patterns
 
@@ -243,16 +244,18 @@ If no config file exists, these patterns are used:
 Sync configuration changes between worktrees without manual copying:
 
 ```bash
-# Copy config files from one worktree to another
-worktree sync-config feature/auth feature/payment
+# Copy config files from the auth worktree to the payments worktree
+worktree sync-config auth payments
+
+# Also accepts absolute paths
+worktree sync-config ~/.worktrees/my-project/auth ~/.worktrees/my-project/payments
 ```
 
 ### Cleanup Operations
 
-Remove orphaned references and clean up unused worktrees:
+Remove orphaned git worktree references:
 
 ```bash
-# Clean up all orphaned worktree references
 worktree cleanup
 ```
 
