@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-03-12
-
 ### Added
 
 - **`[symlink-patterns]` config section:** Files matching these patterns are symlinked into new worktrees instead of copied. Edits in any worktree immediately affect the shared file — ideal for `.env` or shared scripts.
@@ -230,8 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper cleanup of git references and filesystem state
   - Cross-platform path handling and symlink resolution
 
-[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/cafreeman/worktree/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/cafreeman/worktree/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/cafreeman/worktree/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/cafreeman/worktree/compare/v0.3.0...v0.3.1
