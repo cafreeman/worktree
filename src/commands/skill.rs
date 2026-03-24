@@ -204,8 +204,12 @@ mod tests {
         // Override HOME so dirs::home_dir() returns tmp path
         temp_env::with_var(
             "HOME",
-            Some(tmp.path().to_str().expect("valid path")),
-            || f(),
+            Some(
+                tmp.path()
+                    .to_str()
+                    .ok_or_else(|| anyhow::anyhow!("temp path is not valid UTF-8"))?,
+            ),
+            f,
         )
     }
 

@@ -265,10 +265,10 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn make_storage(tmp: &TempDir) -> WorktreeStorage {
+    fn make_storage(tmp: &TempDir) -> Result<WorktreeStorage> {
         let root = tmp.path().join("worktrees");
-        std::fs::create_dir_all(&root).unwrap();
-        WorktreeStorage { root_dir: root }
+        std::fs::create_dir_all(&root)?;
+        Ok(WorktreeStorage { root_dir: root })
     }
 
     // ── validate_feature_name ────────────────────────────────────────────────
@@ -285,8 +285,10 @@ mod tests {
     fn test_validate_feature_name_slash_rejected() {
         let result = WorktreeStorage::validate_feature_name("feature/auth");
         assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(msg.contains('/') || msg.contains("invalid character"));
+        if let Err(e) = result {
+            let msg = e.to_string();
+            assert!(msg.contains('/') || msg.contains("invalid character"));
+        }
     }
 
     #[test]
@@ -310,89 +312,84 @@ mod tests {
     // ── get_worktree_path ────────────────────────────────────────────────────
 
     #[test]
-    fn test_get_worktree_path_uses_feature_name_directly() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
+    fn test_get_worktree_path_uses_feature_name_directly() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
         let path = storage.get_worktree_path("myrepo", "auth");
         assert!(path.to_string_lossy().ends_with("myrepo/auth"));
+        Ok(())
     }
 
     // ── store_worktree_origin / get_worktree_origin ──────────────────────────
 
     #[test]
-    fn test_store_worktree_origin_no_duplicate() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
+    fn test_store_worktree_origin_no_duplicate() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
 
-        storage
-            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
-            .unwrap();
-        storage
-            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
-            .unwrap();
+        storage.store_worktree_origin("myrepo", "auth", "/home/user/repo")?;
+        storage.store_worktree_origin("myrepo", "auth", "/home/user/repo")?;
 
         let origin_file = storage.root_dir.join("myrepo").join(".worktree-origins");
-        let content = std::fs::read_to_string(&origin_file).unwrap();
+        let content = std::fs::read_to_string(&origin_file)?;
         let count = content
             .lines()
             .filter(|l| *l == "auth -> /home/user/repo")
             .count();
         assert_eq!(count, 1);
+        Ok(())
     }
 
     #[test]
-    fn test_store_worktree_origin_roundtrip() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
+    fn test_store_worktree_origin_roundtrip() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
 
-        storage
-            .store_worktree_origin("myrepo", "auth", "/home/user/repo")
-            .unwrap();
+        storage.store_worktree_origin("myrepo", "auth", "/home/user/repo")?;
 
-        let result = storage.get_worktree_origin("myrepo", "auth").unwrap();
+        let result = storage.get_worktree_origin("myrepo", "auth")?;
         assert_eq!(result, Some("/home/user/repo".to_string()));
+        Ok(())
     }
 
     #[test]
-    fn test_store_worktree_origin_different_features_independent() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
+    fn test_store_worktree_origin_different_features_independent() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
 
-        storage
-            .store_worktree_origin("myrepo", "auth", "/repo1")
-            .unwrap();
-        storage
-            .store_worktree_origin("myrepo", "payments", "/repo2")
-            .unwrap();
+        storage.store_worktree_origin("myrepo", "auth", "/repo1")?;
+        storage.store_worktree_origin("myrepo", "payments", "/repo2")?;
 
         assert_eq!(
-            storage.get_worktree_origin("myrepo", "auth").unwrap(),
+            storage.get_worktree_origin("myrepo", "auth")?,
             Some("/repo1".to_string())
         );
         assert_eq!(
-            storage.get_worktree_origin("myrepo", "payments").unwrap(),
+            storage.get_worktree_origin("myrepo", "payments")?,
             Some("/repo2".to_string())
         );
+        Ok(())
     }
 
     // ── list_repo_worktrees ──────────────────────────────────────────────────
 
     #[test]
-    fn test_list_repo_worktrees_skips_hidden_dirs() {
-        let tmp = TempDir::new().unwrap();
-        let storage = make_storage(&tmp);
+    fn test_list_repo_worktrees_skips_hidden_dirs() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
         let repo_dir = storage.root_dir.join("myrepo");
-        std::fs::create_dir_all(repo_dir.join("auth")).unwrap();
-        std::fs::create_dir_all(repo_dir.join("payments")).unwrap();
+        std::fs::create_dir_all(repo_dir.join("auth"))?;
+        std::fs::create_dir_all(repo_dir.join("payments"))?;
         // Hidden dir should be skipped
-        std::fs::create_dir_all(repo_dir.join(".hidden")).unwrap();
+        std::fs::create_dir_all(repo_dir.join(".hidden"))?;
         // File should not appear (not a dir)
-        std::fs::write(repo_dir.join(".worktree-origins"), "").unwrap();
+        std::fs::write(repo_dir.join(".worktree-origins"), "")?;
 
-        let worktrees = storage.list_repo_worktrees("myrepo").unwrap();
+        let worktrees = storage.list_repo_worktrees("myrepo")?;
         assert!(worktrees.contains(&"auth".to_string()));
         assert!(worktrees.contains(&"payments".to_string()));
         assert!(!worktrees.contains(&".hidden".to_string()));
         assert_eq!(worktrees.len(), 2);
+        Ok(())
     }
 }

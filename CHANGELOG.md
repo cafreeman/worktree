@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2025-09-22
 
-### Enhanced
+### Changed
 
 - **Interactive Git Reference Selection:**
   - Improved `worktree create` interactive workflow with hierarchical git reference selection
@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prunes orphaned worktree directories and associated metadata if the git branch was deleted externally
   - Continues to remove orphaned git worktree references
 
-### Tests
+### Added
 
 - Added integration tests covering selective branch deletion and orphan directory pruning
 
