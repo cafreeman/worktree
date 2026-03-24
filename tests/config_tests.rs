@@ -353,8 +353,12 @@ exclude = [".vscode/"]
     )?;
 
     // Create worktrees using feature-name + branch pairs
-    env.run_command(&["create", "source", "feature/source"])?.assert().success();
-    env.run_command(&["create", "target", "feature/target"])?.assert().success();
+    env.run_command(&["create", "source", "feature/source"])?
+        .assert()
+        .success();
+    env.run_command(&["create", "target", "feature/target"])?
+        .assert()
+        .success();
 
     let source_path = env.worktree_path("source");
     let target_path = env.worktree_path("target");

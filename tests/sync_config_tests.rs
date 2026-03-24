@@ -100,13 +100,9 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
         .write_str(r#"{"type": "node"}"#)?;
 
     // Test sync
-    env.run_command(&[
-        "sync-config",
-        "custom-source",
-        "custom-target",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "custom-source", "custom-target"])?
+        .assert()
+        .success();
 
     // Verify all custom patterns were copied
     target_path
@@ -280,13 +276,9 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
         .write_str("should not copy")?;
 
     // Test sync
-    env.run_command(&[
-        "sync-config",
-        "exclude-source",
-        "exclude-target",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "exclude-source", "exclude-target"])?
+        .assert()
+        .success();
 
     // Verify included files were copied
     target_path
@@ -343,13 +335,9 @@ fn test_sync_config_preserves_content() -> Result<()> {
         .write_str(complex_config)?;
 
     // Test sync
-    env.run_command(&[
-        "sync-config",
-        "preserve-source",
-        "preserve-target",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "preserve-source", "preserve-target"])?
+        .assert()
+        .success();
 
     // Verify exact content preservation
     target_path
@@ -379,13 +367,9 @@ fn test_sync_config_empty_source() -> Result<()> {
     // Don't create any config files in source
 
     // Test sync - should succeed but copy nothing
-    env.run_command(&[
-        "sync-config",
-        "empty-source",
-        "empty-target",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "empty-source", "empty-target"])?
+        .assert()
+        .success();
 
     // Verify target remains clean (just git files)
     let target_path = env.worktree_path("empty-target");

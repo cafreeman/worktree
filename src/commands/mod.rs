@@ -5,5 +5,6 @@ pub mod init;
 pub mod jump;
 pub mod list;
 pub mod remove;
+pub mod skill;
 pub mod status;
 pub mod sync_config;

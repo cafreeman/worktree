@@ -65,7 +65,11 @@ pub fn remove_worktree_with_provider(
         anyhow::bail!("Worktree path does not exist: {}", worktree_path.display());
     }
 
-    println!("Removing worktree '{}': {}", feature_name, worktree_path.display());
+    println!(
+        "Removing worktree '{}': {}",
+        feature_name,
+        worktree_path.display()
+    );
 
     // Read current branch from worktree HEAD before removing it
     let current_branch = read_worktree_head_branch(&worktree_path);
@@ -102,7 +106,10 @@ pub fn remove_worktree_with_provider(
             println!("⚠ Warning: Could not determine branch to delete (detached HEAD or error)");
         }
     } else if let Some(branch) = &current_branch {
-        println!("Branch '{}' preserved (use --delete-branch to remove it)", branch);
+        println!(
+            "Branch '{}' preserved (use --delete-branch to remove it)",
+            branch
+        );
     }
 
     println!("✓ Worktree removed successfully!");
@@ -133,7 +140,10 @@ fn resolve_target(
             Ok((path, feature_name))
         }
         _ => {
-            eprintln!("Multiple worktrees match '{}'. Please be more specific:", target);
+            eprintln!(
+                "Multiple worktrees match '{}'. Please be more specific:",
+                target
+            );
             for name in &matches {
                 eprintln!("  {}", name);
             }
@@ -170,7 +180,13 @@ fn select_worktree_for_removal(
             let branch_info = read_worktree_head_branch(path)
                 .map(|b| format!(" ({})", b))
                 .unwrap_or_default();
-            format!("{}/{}{} ({})", repo, feature_name, branch_info, path.display())
+            format!(
+                "{}/{}{} ({})",
+                repo,
+                feature_name,
+                branch_info,
+                path.display()
+            )
         })
         .collect();
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`worktree skill` subcommand:** Install, uninstall, update, and check the status of the companion agent skill. The skill file is embedded in the binary at compile time and teaches AI coding agents (e.g. Claude Code) the correct commands, flags, and shell-wrapper behavior. Run `worktree skill install` after installing the binary.
 - **`[symlink-patterns]` config section:** Files matching these patterns are symlinked into new worktrees instead of copied. Edits in any worktree immediately affect the shared file — ideal for `.env` or shared scripts.
 - **`[on-create]` config section:** Shell commands run after each worktree is created (via `sh -c`). Supports shell operators, pipes, and redirects. A failing command prints a warning and skips remaining hooks but does not abort worktree creation.
 - **`--from <ref>` flag on `create`:** Creates the new branch starting from a specified branch, tag, or commit hash.

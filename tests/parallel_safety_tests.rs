@@ -305,8 +305,7 @@ fn test_concurrent_worktree_operations() -> Result<()> {
                 2 => {
                     // Thread 2: Create one new worktree with unique name
                     let unique_feature = format!("thread-{}-unique", std::process::id());
-                    let unique_branch =
-                        format!("concurrent/thread-{}-unique", std::process::id());
+                    let unique_branch = format!("concurrent/thread-{}-unique", std::process::id());
                     env_clone
                         .run_command(&["create", &unique_feature, &unique_branch])?
                         .assert()
@@ -390,10 +389,7 @@ fn test_cleanup_isolation() -> Result<()> {
     // Verify we can't see the old environment's worktrees
     let output_str = get_stdout(&env2, &["list"])?;
 
-    assert!(
-        output_str.contains("new-test"),
-        "Should see new worktree"
-    );
+    assert!(output_str.contains("new-test"), "Should see new worktree");
     assert!(
         !output_str.contains("cleanup-test"),
         "Should not see old worktree"
@@ -429,19 +425,13 @@ fn test_environment_variable_isolation() -> Result<()> {
     let output1 = get_stdout(&env1, &["list"])?;
     let output2 = get_stdout(&env2, &["list"])?;
 
-    assert!(
-        output1.contains("env1"),
-        "Env1 should see its worktree"
-    );
+    assert!(output1.contains("env1"), "Env1 should see its worktree");
     assert!(
         !output1.contains("env2"),
         "Env1 should not see env2's worktree"
     );
 
-    assert!(
-        output2.contains("env2"),
-        "Env2 should see its worktree"
-    );
+    assert!(output2.contains("env2"), "Env2 should see its worktree");
     assert!(
         !output2.contains("env1"),
         "Env2 should not see env1's worktree"

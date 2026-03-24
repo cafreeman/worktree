@@ -42,7 +42,9 @@ fn test_list_multiple_worktrees() -> Result<()> {
         ("release-v1", "release/v1.0"),
     ];
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Test list command

@@ -51,9 +51,13 @@ fn test_complete_development_workflow() -> Result<()> {
     assert_eq!(jump_output.trim(), main_worktree.to_string_lossy());
 
     // Step 3: Create additional worktree for sub-feature
-    env.run_command(&["create", "payment-integration", "feature/payment-integration"])?
-        .assert()
-        .success();
+    env.run_command(&[
+        "create",
+        "payment-integration",
+        "feature/payment-integration",
+    ])?
+    .assert()
+    .success();
 
     let sub_worktree = env.worktree_path("payment-integration");
     sub_worktree.assert(predicate::path::is_dir());
@@ -66,13 +70,9 @@ fn test_complete_development_workflow() -> Result<()> {
         .child("payment.local.json")
         .write_str(r#"{"stripe_key": "test_key"}"#)?;
 
-    env.run_command(&[
-        "sync-config",
-        "payment-system",
-        "payment-integration",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "payment-system", "payment-integration"])?
+        .assert()
+        .success();
 
     // Verify sync worked
     sub_worktree
@@ -122,7 +122,9 @@ fn test_multi_worktree_development_cycle() -> Result<()> {
 
     // Step 1: Create all worktrees
     for (feature, branch) in &features {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Verify all were created
@@ -158,15 +160,12 @@ fn test_multi_worktree_development_cycle() -> Result<()> {
         .assert()
         .success();
 
-    env.run_command(&["remove", "auth"])?
-        .assert()
-        .success();
+    env.run_command(&["remove", "auth"])?.assert().success();
 
     // Verify selective removal
     env.worktree_path("login-fix")
         .assert(predicate::path::missing());
-    env.worktree_path("auth")
-        .assert(predicate::path::missing());
+    env.worktree_path("auth").assert(predicate::path::missing());
     env.worktree_path("dashboard")
         .assert(predicate::path::exists());
     env.worktree_path("api-v2")
@@ -227,13 +226,9 @@ fn test_config_inheritance_workflow() -> Result<()> {
     let derived_path = env.worktree_path("derived-config");
 
     // Step 5: Sync enhanced config to derivative
-    env.run_command(&[
-        "sync-config",
-        "base-config",
-        "derived-config",
-    ])?
-    .assert()
-    .success();
+    env.run_command(&["sync-config", "base-config", "derived-config"])?
+        .assert()
+        .success();
 
     // Verify sync of modified config
     derived_path
@@ -299,9 +294,7 @@ fn test_error_recovery_workflow() -> Result<()> {
     assert!(completions.contains("success"));
 
     // Step 5: Clean recovery
-    env.run_command(&["remove", "success"])?
-        .assert()
-        .success();
+    env.run_command(&["remove", "success"])?.assert().success();
 
     success_path.assert(predicate::path::missing());
 
@@ -324,7 +317,9 @@ fn test_feature_name_edge_cases_workflow() -> Result<()> {
 
     // Step 1: Create worktrees with these feature names
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Step 2: Verify all can be jumped to using feature names
@@ -381,7 +376,9 @@ fn test_scale_workflow() -> Result<()> {
         let branch = format!("feature/bulk-{:02}", i);
         worktree_names.push(feature.clone());
 
-        env.run_command(&["create", &feature, &branch])?.assert().success();
+        env.run_command(&["create", &feature, &branch])?
+            .assert()
+            .success();
     }
 
     // Step 2: Verify all exist

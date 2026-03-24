@@ -28,7 +28,10 @@ pub fn cleanup_worktrees() -> Result<()> {
                 }
 
                 if is_prunable || !path.exists() {
-                    println!("🗑️  Found orphaned git worktree reference: {}", path.display());
+                    println!(
+                        "🗑️  Found orphaned git worktree reference: {}",
+                        path.display()
+                    );
                     match git_repo.remove_worktree(&name) {
                         Ok(_) => {
                             println!("   ✓ Removed git worktree reference: {}", name);

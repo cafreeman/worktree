@@ -30,7 +30,9 @@ fn test_jump_completion_output_format() -> Result<()> {
     ];
 
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Test completion output
@@ -84,7 +86,9 @@ fn test_remove_completion_output_format() -> Result<()> {
     ];
 
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Test completion output
@@ -143,7 +147,9 @@ fn test_completion_current_repo_filtering() -> Result<()> {
         ("current-2", "feature/current-2"),
     ];
     for (feature, branch) in &current_worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Test current repo only filtering for jump
@@ -202,7 +208,9 @@ fn test_completion_output_stability() -> Result<()> {
     ];
 
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Get completion output multiple times
@@ -226,7 +234,11 @@ fn test_completion_output_stability() -> Result<()> {
     );
 
     for (feature, _) in &worktrees {
-        assert!(lines.contains(feature), "Should include feature: {}", feature);
+        assert!(
+            lines.contains(feature),
+            "Should include feature: {}",
+            feature
+        );
     }
 
     Ok(())
@@ -246,7 +258,9 @@ fn test_completion_feature_names() -> Result<()> {
     ];
 
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Get completion output
@@ -299,7 +313,9 @@ fn test_completion_with_config_setup() -> Result<()> {
         ("also-config", "bugfix/also-config"),
     ];
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Verify completions work normally regardless of config setup
@@ -426,7 +442,9 @@ fn test_completion_performance_many_worktrees() -> Result<()> {
         let feature = format!("test-{:03}", i);
         let branch = format!("feature/test-{:03}", i);
         features.push(feature.clone());
-        env.run_command(&["create", &feature, &branch])?.assert().success();
+        env.run_command(&["create", &feature, &branch])?
+            .assert()
+            .success();
     }
 
     // Test completion still works efficiently
@@ -436,18 +454,9 @@ fn test_completion_performance_many_worktrees() -> Result<()> {
     assert_eq!(lines.len(), features.len(), "Should list all worktrees");
 
     // Verify random sampling of feature names
-    assert!(
-        lines.contains(&"test-000"),
-        "Should include first feature"
-    );
-    assert!(
-        lines.contains(&"test-025"),
-        "Should include middle feature"
-    );
-    assert!(
-        lines.contains(&"test-049"),
-        "Should include last feature"
-    );
+    assert!(lines.contains(&"test-000"), "Should include first feature");
+    assert!(lines.contains(&"test-025"), "Should include middle feature");
+    assert!(lines.contains(&"test-049"), "Should include last feature");
 
     Ok(())
 }

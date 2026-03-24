@@ -86,7 +86,13 @@ fn select_worktree_interactive(
             let branch_info = read_worktree_head_branch(path)
                 .map(|b| format!(" ({})", b))
                 .unwrap_or_default();
-            format!("{}/{}{} ({})", repo, feature_name, branch_info, path.display())
+            format!(
+                "{}/{}{} ({})",
+                repo,
+                feature_name,
+                branch_info,
+                path.display()
+            )
         })
         .collect();
 

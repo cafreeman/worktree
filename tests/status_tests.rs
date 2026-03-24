@@ -35,7 +35,9 @@ fn test_status_with_worktrees() -> Result<()> {
         ("status-fix", "bugfix/status"),
     ];
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Status should succeed with worktrees

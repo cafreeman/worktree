@@ -18,11 +18,7 @@ use crate::storage::WorktreeStorage;
 /// - The feature name is invalid
 /// - The worktree path already exists
 /// - Git operations fail
-pub fn create_worktree(
-    feature_name: &str,
-    branch: Option<&str>,
-    from: Option<&str>,
-) -> Result<()> {
+pub fn create_worktree(feature_name: &str, branch: Option<&str>, from: Option<&str>) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     create_worktree_internal(&git_repo, feature_name, branch, from)
@@ -162,15 +158,13 @@ pub fn create_symlinks(
                     continue;
                 }
 
-                std::os::unix::fs::symlink(&canonical_source, &target_link).with_context(
-                    || {
-                        format!(
-                            "Failed to create symlink {} -> {}",
-                            target_link.display(),
-                            canonical_source.display()
-                        )
-                    },
-                )?;
+                std::os::unix::fs::symlink(&canonical_source, &target_link).with_context(|| {
+                    format!(
+                        "Failed to create symlink {} -> {}",
+                        target_link.display(),
+                        canonical_source.display()
+                    )
+                })?;
 
                 println!(
                     "  Symlinked: {} -> {}",
@@ -545,10 +539,8 @@ pub fn interactive_create_workflow() -> Result<()> {
     )?;
 
     // Step 2: Get starting branch name
-    let branch_name = provider.get_text_input(
-        "Starting branch name:",
-        Some(validate_branch_name),
-    )?;
+    let branch_name =
+        provider.get_text_input("Starting branch name:", Some(validate_branch_name))?;
 
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
@@ -578,10 +570,8 @@ pub fn interactive_create_with_feature(feature_name: &str) -> Result<()> {
     WorktreeStorage::validate_feature_name(feature_name)?;
 
     // Step 1: Get starting branch name
-    let branch_name = provider.get_text_input(
-        "Starting branch name:",
-        Some(validate_branch_name),
-    )?;
+    let branch_name =
+        provider.get_text_input("Starting branch name:", Some(validate_branch_name))?;
 
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
@@ -672,7 +662,10 @@ mod tests {
         let config = make_config_with_symlinks(vec!["does-not-exist.txt".to_string()]);
         let result = create_symlinks(&origin, &worktree, &config);
 
-        assert!(result.is_ok(), "missing origin path should not cause an error");
+        assert!(
+            result.is_ok(),
+            "missing origin path should not cause an error"
+        );
         assert!(
             !worktree.join("does-not-exist.txt").exists(),
             "no symlink should be created for missing path"
@@ -757,7 +750,10 @@ mod tests {
         let content = fs::read_to_string(&marker).unwrap_or_default();
         let lines: Vec<&str> = content.lines().collect();
         // First command ran, third command did not
-        assert!(lines.contains(&"before-fail"), "command before failure should have run");
+        assert!(
+            lines.contains(&"before-fail"),
+            "command before failure should have run"
+        );
         assert!(
             !lines.contains(&"after-fail"),
             "command after failure should NOT have run"
@@ -778,7 +774,10 @@ mod tests {
         run_on_create_hooks(&worktree, &config).unwrap();
 
         // Worktree directory and its contents must still exist
-        assert!(worktree.exists(), "worktree directory should still exist after hook failure");
+        assert!(
+            worktree.exists(),
+            "worktree directory should still exist after hook failure"
+        );
         assert!(
             worktree.join("important.txt").exists(),
             "worktree contents should be intact after hook failure"

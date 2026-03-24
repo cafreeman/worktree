@@ -1,7 +1,10 @@
 use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use worktree::Result;
 use worktree::commands::init::Shell;
-use worktree::commands::{back, cleanup, create, init, jump, list, remove, status, sync_config};
+use worktree::commands::skill::SkillAction;
+use worktree::commands::{
+    back, cleanup, create, init, jump, list, remove, skill, status, sync_config,
+};
 
 #[derive(Parser)]
 #[command(name = "worktree")]
@@ -99,6 +102,11 @@ enum Commands {
     Cleanup,
     /// Navigate back to the original repository
     Back,
+    /// Manage the worktree-manager agent skill
+    Skill {
+        #[command(subcommand)]
+        action: SkillAction,
+    },
 }
 
 fn main() -> Result<()> {
@@ -202,6 +210,9 @@ fn main() -> Result<()> {
         }
         Commands::Back => {
             back::back_to_origin()?;
+        }
+        Commands::Skill { action } => {
+            skill::run_skill_command(&action)?;
         }
     }
 

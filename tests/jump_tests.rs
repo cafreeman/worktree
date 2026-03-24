@@ -212,7 +212,9 @@ fn test_jump_multiple_worktrees() -> Result<()> {
     ];
 
     for (feature, branch) in &worktrees {
-        env.run_command(&["create", feature, branch])?.assert().success();
+        env.run_command(&["create", feature, branch])?
+            .assert()
+            .success();
     }
 
     // Test jumping to each one by feature name

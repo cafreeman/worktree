@@ -18,14 +18,15 @@ fn test_remove_preserves_branch_by_default() -> Result<()> {
         .assert()
         .success();
 
-    env.worktree_path("test1")
-        .assert(predicate::path::is_dir());
+    env.worktree_path("test1").assert(predicate::path::is_dir());
 
     // Remove without --delete-branch: branch should be preserved
     env.run_command(&["remove", "test1"])?
         .assert()
         .success()
-        .stdout(predicate::str::contains("preserved").or(predicate::str::contains("Worktree removed")));
+        .stdout(
+            predicate::str::contains("preserved").or(predicate::str::contains("Worktree removed")),
+        );
 
     env.worktree_path("test1")
         .assert(predicate::path::missing());
@@ -68,20 +69,15 @@ fn test_interactive_remove_selection() -> Result<()> {
         .assert()
         .success();
 
-    env.worktree_path("test1")
-        .assert(predicate::path::is_dir());
-    env.worktree_path("test2")
-        .assert(predicate::path::is_dir());
+    env.worktree_path("test1").assert(predicate::path::is_dir());
+    env.worktree_path("test2").assert(predicate::path::is_dir());
 
     // Non-interactive removal by feature name
-    env.run_command(&["remove", "test1"])?
-        .assert()
-        .success();
+    env.run_command(&["remove", "test1"])?.assert().success();
 
     env.worktree_path("test1")
         .assert(predicate::path::missing());
-    env.worktree_path("test2")
-        .assert(predicate::path::exists());
+    env.worktree_path("test2").assert(predicate::path::exists());
 
     Ok(())
 }
@@ -135,15 +131,11 @@ fn test_remove_by_feature_name() -> Result<()> {
         .assert()
         .success();
 
-    env.worktree_path("auth")
-        .assert(predicate::path::is_dir());
+    env.worktree_path("auth").assert(predicate::path::is_dir());
 
-    env.run_command(&["remove", "auth"])?
-        .assert()
-        .success();
+    env.run_command(&["remove", "auth"])?.assert().success();
 
-    env.worktree_path("auth")
-        .assert(predicate::path::missing());
+    env.worktree_path("auth").assert(predicate::path::missing());
 
     Ok(())
 }

@@ -39,7 +39,10 @@ fn test_create_worktree_with_config_files() -> Result<()> {
 
     // No .branch-mapping file should be created
     let mapping_file = env.storage_dir.child("test_repo").child(".branch-mapping");
-    assert!(!mapping_file.path().exists(), ".branch-mapping should not be created");
+    assert!(
+        !mapping_file.path().exists(),
+        ".branch-mapping should not be created"
+    );
 
     Ok(())
 }
@@ -82,8 +85,7 @@ fn test_create_worktree_smart_mode_new_branch() -> Result<()> {
         .assert()
         .success();
 
-    env.worktree_path("smart")
-        .assert(predicate::path::is_dir());
+    env.worktree_path("smart").assert(predicate::path::is_dir());
 
     Ok(())
 }
@@ -171,9 +173,15 @@ fn test_create_worktree_with_from_flag() -> Result<()> {
         .assert(predicate::path::is_dir());
 
     // From tag
-    env.run_command(&["create", "from-tag", "feature/from-tag", "--from", "test-tag-v1.0"])?
-        .assert()
-        .success();
+    env.run_command(&[
+        "create",
+        "from-tag",
+        "feature/from-tag",
+        "--from",
+        "test-tag-v1.0",
+    ])?
+    .assert()
+    .success();
 
     env.worktree_path("from-tag")
         .assert(predicate::path::is_dir());
@@ -186,12 +194,18 @@ fn test_create_worktree_with_from_flag() -> Result<()> {
 fn test_create_worktree_from_invalid_reference() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    env.run_command(&["create", "invalid", "feature/invalid", "--from", "non-existent-branch"])?
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "Failed to resolve reference 'non-existent-branch'",
-        ));
+    env.run_command(&[
+        "create",
+        "invalid",
+        "feature/invalid",
+        "--from",
+        "non-existent-branch",
+    ])?
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "Failed to resolve reference 'non-existent-branch'",
+    ));
 
     assert!(!env.worktree_path("invalid").path().exists());
 
@@ -241,9 +255,15 @@ fn test_create_worktree_from_commit_hash() -> Result<()> {
 
     let commit_hash = String::from_utf8(output.stdout)?.trim().to_string();
 
-    env.run_command(&["create", "from-commit", "feature/from-commit", "--from", &commit_hash])?
-        .assert()
-        .success();
+    env.run_command(&[
+        "create",
+        "from-commit",
+        "feature/from-commit",
+        "--from",
+        &commit_hash,
+    ])?
+    .assert()
+    .success();
 
     env.worktree_path("from-commit")
         .assert(predicate::path::is_dir());

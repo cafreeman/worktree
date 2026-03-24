@@ -50,6 +50,22 @@ eval "$(worktree-bin init zsh)"
 worktree-bin init fish | source
 ```
 
+### 3. Install the Agent Skill (Optional)
+
+If you use an AI coding agent (e.g. Claude Code), install the companion skill so your agent knows how to use `worktree` correctly:
+
+```bash
+worktree skill install
+```
+
+This installs a skill file into `~/.agents/skills/worktree-manager/` and creates a symlink at `~/.claude/skills/worktree-manager` for Claude Code to pick up automatically. The skill teaches your agent the correct commands, flags, and shell-wrapper behavior.
+
+```bash
+worktree skill status   # Check if installed and up to date
+worktree skill update   # Update after upgrading the binary
+worktree skill uninstall  # Remove if no longer needed
+```
+
 ## Commands
 
 | Command                        | Description                                                    |
@@ -63,6 +79,7 @@ worktree-bin init fish | source
 | `sync-config <from> <to>`      | Copy config files between worktrees                            |
 | `back`                         | Return to the original repository                              |
 | `cleanup`                      | Clean up orphaned worktree references                          |
+| `skill <install\|uninstall\|update\|status>` | Manage the companion agent skill             |
 
 ## Interactive Features
 

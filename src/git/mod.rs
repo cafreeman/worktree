@@ -155,9 +155,7 @@ impl GitRepo {
         for name in worktree_names.iter().flatten() {
             if let Ok(wt) = self.repo.find_worktree(name) {
                 let path = wt.path().to_path_buf();
-                let is_prunable = wt
-                    .is_prunable(None)
-                    .unwrap_or(false);
+                let is_prunable = wt.is_prunable(None).unwrap_or(false);
                 result.push((name.to_string(), path, is_prunable));
             }
         }
