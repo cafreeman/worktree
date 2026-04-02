@@ -36,6 +36,7 @@ enum Commands {
         list_from_completions: bool,
     },
     /// List all worktrees
+    #[command(visible_alias = "ls")]
     List {
         /// Show worktrees for current repo only
         #[arg(long)]

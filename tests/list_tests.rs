@@ -62,6 +62,26 @@ fn test_list_multiple_worktrees() -> Result<()> {
     Ok(())
 }
 
+/// `ls` is a visible alias for `list`
+#[test]
+fn test_list_ls_alias() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "alias-test", "feature/alias-test"])?
+        .assert()
+        .success();
+
+    let from_list = get_stdout(&env, &["list"])?;
+    let from_ls = get_stdout(&env, &["ls"])?;
+    assert_eq!(from_list, from_ls);
+
+    let from_list_current = get_stdout(&env, &["list", "--current"])?;
+    let from_ls_current = get_stdout(&env, &["ls", "--current"])?;
+    assert_eq!(from_list_current, from_ls_current);
+
+    Ok(())
+}
+
 /// Test list command with current repo flag
 #[test]
 fn test_list_current_repo() -> Result<()> {
