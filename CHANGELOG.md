@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ls` alias for `list`:** `worktree ls` is equivalent to `worktree list` (including `--current`). The alias appears in help and generated shell completions; bash/zsh integration fallbacks include it when clap completions are unavailable.
+
 ## [0.5.0] - 2026-03-24
 
 ### Added
