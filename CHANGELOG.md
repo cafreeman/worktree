@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-02
+
 ### Added
 
 - **`ls` alias for `list`:** `worktree ls` is equivalent to `worktree list` (including `--current`). The alias appears in help and generated shell completions; bash/zsh integration fallbacks include it when clap completions are unavailable.
@@ -235,7 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper cleanup of git references and filesystem state
   - Cross-platform path handling and symlink resolution
 
-[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/cafreeman/worktree/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/cafreeman/worktree/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/cafreeman/worktree/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/cafreeman/worktree/compare/v0.3.1...v0.3.2
