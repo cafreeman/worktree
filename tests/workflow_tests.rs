@@ -70,7 +70,7 @@ fn test_complete_development_workflow() -> Result<()> {
         .child("payment.local.json")
         .write_str(r#"{"stripe_key": "test_key"}"#)?;
 
-    env.run_command(&["sync-config", "payment-system", "payment-integration"])?
+    env.run_command(&["sync", "payment-system", "payment-integration"])?
         .assert()
         .success();
 
@@ -226,7 +226,7 @@ fn test_config_inheritance_workflow() -> Result<()> {
     let derived_path = env.worktree_path("derived-config");
 
     // Step 5: Sync enhanced config to derivative
-    env.run_command(&["sync-config", "base-config", "derived-config"])?
+    env.run_command(&["sync", "base-config", "derived-config"])?
         .assert()
         .success();
 
@@ -281,7 +281,7 @@ fn test_error_recovery_workflow() -> Result<()> {
         .failure()
         .stderr(predicate::str::contains("No worktree found"));
 
-    env.run_command(&["sync-config", "nonexistent", "success"])?
+    env.run_command(&["sync", "nonexistent", "success"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -341,7 +341,7 @@ fn test_feature_name_edge_cases_workflow() -> Result<()> {
         .child(".env")
         .write_str("AUTH_SERVICE=enabled")?;
 
-    env.run_command(&["sync-config", "user-auth", "api-v2"])?
+    env.run_command(&["sync", "user-auth", "api-v2"])?
         .assert()
         .success();
 

@@ -25,6 +25,29 @@ exclude = {:?}
     Ok(())
 }
 
+/// Create a worktree configuration file with both copy- and symlink-patterns for testing
+pub fn create_worktree_config_with_symlinks(
+    repo_dir: &assert_fs::fixture::ChildPath,
+    copy_include: &[&str],
+    symlink_include: &[&str],
+) -> Result<()> {
+    let config_content = format!(
+        r#"[copy-patterns]
+include = {:?}
+
+[symlink-patterns]
+include = {:?}
+"#,
+        copy_include, symlink_include
+    );
+
+    repo_dir
+        .child(".worktree-config.toml")
+        .write_str(&config_content)?;
+
+    Ok(())
+}
+
 /// Create sample files that match typical config patterns
 pub fn create_sample_config_files(repo_dir: &assert_fs::fixture::ChildPath) -> Result<()> {
     // Create .env file

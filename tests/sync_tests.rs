@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)] // Tests use unwrap for simplicity
 
-//! Modern integration tests for the sync-config command
+//! Modern integration tests for the sync command
 //!
 //! These tests validate configuration file synchronization between worktrees,
 //! including custom patterns, error handling, and content preservation.
@@ -11,12 +11,12 @@ use predicates::prelude::*;
 
 use test_support::{
     CliTestEnvironment, assert_config_files_copied, create_sample_config_files,
-    create_worktree_config,
+    create_worktree_config, create_worktree_config_with_symlinks,
 };
 
 /// Test basic configuration file synchronization between worktrees
 #[test]
-fn test_sync_config_between_worktrees() -> Result<()> {
+fn test_sync_between_worktrees() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create source and target worktrees using feature-name + branch pairs
@@ -37,8 +37,8 @@ fn test_sync_config_between_worktrees() -> Result<()> {
     // Create config files in source using our helper
     create_sample_config_files(&source_path)?;
 
-    // Test sync-config command
-    env.run_command(&["sync-config", "source", "target"])?
+    // Test sync command
+    env.run_command(&["sync", "source", "target"])?
         .assert()
         .success();
 
@@ -59,7 +59,7 @@ fn test_sync_config_between_worktrees() -> Result<()> {
 
 /// Test sync command with custom configuration patterns
 #[test]
-fn test_sync_config_with_custom_patterns() -> Result<()> {
+fn test_sync_with_custom_patterns() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create custom worktree config
@@ -100,7 +100,7 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
         .write_str(r#"{"type": "node"}"#)?;
 
     // Test sync
-    env.run_command(&["sync-config", "custom-source", "custom-target"])?
+    env.run_command(&["sync", "custom-source", "custom-target"])?
         .assert()
         .success();
 
@@ -124,7 +124,7 @@ fn test_sync_config_with_custom_patterns() -> Result<()> {
 
 /// Test sync command using absolute filesystem paths
 #[test]
-fn test_sync_config_with_absolute_paths() -> Result<()> {
+fn test_sync_with_absolute_paths() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
@@ -149,7 +149,7 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
 
     // Test sync using absolute paths
     env.run_command(&[
-        "sync-config",
+        "sync",
         &source_path.to_string_lossy(),
         &target_path.to_string_lossy(),
     ])?
@@ -169,7 +169,7 @@ fn test_sync_config_with_absolute_paths() -> Result<()> {
 
 /// Test sync with feature names (no slash required)
 #[test]
-fn test_sync_config_with_feature_names() -> Result<()> {
+fn test_sync_with_feature_names() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees using feature names
@@ -188,7 +188,7 @@ fn test_sync_config_with_feature_names() -> Result<()> {
     create_sample_config_files(&source_path)?;
 
     // Test sync using feature names directly
-    env.run_command(&["sync-config", "sync-source", "sync-target"])?
+    env.run_command(&["sync", "sync-source", "sync-target"])?
         .assert()
         .success();
 
@@ -200,7 +200,7 @@ fn test_sync_config_with_feature_names() -> Result<()> {
 
 /// Test error handling when source worktree doesn't exist
 #[test]
-fn test_sync_config_nonexistent_source() -> Result<()> {
+fn test_sync_nonexistent_source() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create only target worktree
@@ -209,7 +209,7 @@ fn test_sync_config_nonexistent_source() -> Result<()> {
         .success();
 
     // Try to sync from nonexistent source
-    env.run_command(&["sync-config", "nonexistent", "target-only"])?
+    env.run_command(&["sync", "nonexistent", "target-only"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -219,7 +219,7 @@ fn test_sync_config_nonexistent_source() -> Result<()> {
 
 /// Test error handling when target worktree doesn't exist
 #[test]
-fn test_sync_config_nonexistent_target() -> Result<()> {
+fn test_sync_nonexistent_target() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create only source worktree
@@ -228,7 +228,7 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
         .success();
 
     // Try to sync to nonexistent target
-    env.run_command(&["sync-config", "source-only", "nonexistent"])?
+    env.run_command(&["sync", "source-only", "nonexistent"])?
         .assert()
         .failure()
         .stderr(predicate::str::contains("does not exist"));
@@ -238,7 +238,7 @@ fn test_sync_config_nonexistent_target() -> Result<()> {
 
 /// Test selective file copying with include/exclude patterns
 #[test]
-fn test_sync_config_exclude_patterns() -> Result<()> {
+fn test_sync_exclude_patterns() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create config with specific exclude patterns
@@ -276,7 +276,7 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
         .write_str("should not copy")?;
 
     // Test sync
-    env.run_command(&["sync-config", "exclude-source", "exclude-target"])?
+    env.run_command(&["sync", "exclude-source", "exclude-target"])?
         .assert()
         .success();
 
@@ -304,7 +304,7 @@ fn test_sync_config_exclude_patterns() -> Result<()> {
 
 /// Test sync command preserves file content and structure
 #[test]
-fn test_sync_config_preserves_content() -> Result<()> {
+fn test_sync_preserves_content() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
@@ -335,7 +335,7 @@ fn test_sync_config_preserves_content() -> Result<()> {
         .write_str(complex_config)?;
 
     // Test sync
-    env.run_command(&["sync-config", "preserve-source", "preserve-target"])?
+    env.run_command(&["sync", "preserve-source", "preserve-target"])?
         .assert()
         .success();
 
@@ -352,7 +352,7 @@ fn test_sync_config_preserves_content() -> Result<()> {
 
 /// Test sync command behavior when source has no config files
 #[test]
-fn test_sync_config_empty_source() -> Result<()> {
+fn test_sync_empty_source() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
     // Create worktrees
@@ -367,7 +367,7 @@ fn test_sync_config_empty_source() -> Result<()> {
     // Don't create any config files in source
 
     // Test sync - should succeed but copy nothing
-    env.run_command(&["sync-config", "empty-source", "empty-target"])?
+    env.run_command(&["sync", "empty-source", "empty-target"])?
         .assert()
         .success();
 
@@ -380,6 +380,162 @@ fn test_sync_config_empty_source() -> Result<()> {
     target_path
         .child(".vscode")
         .assert(predicate::path::missing());
+
+    Ok(())
+}
+
+/// Test that `sync` with exactly one of from/to is a usage error
+#[test]
+fn test_sync_one_argument_is_usage_error() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "only-one", "feature/only-one"])?
+        .assert()
+        .success();
+
+    env.run_command(&["sync", "only-one"])?
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Both"));
+
+    Ok(())
+}
+
+/// Test that `sync` is symlink-aware: a pattern added after worktree creation
+/// gets pushed out as a symlink by a pairwise sync.
+#[test]
+fn test_sync_pushes_out_new_symlink_pattern() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "sym-source", "feature/sym-source"])?
+        .assert()
+        .success();
+    env.run_command(&["create", "sym-target", "feature/sym-target"])?
+        .assert()
+        .success();
+
+    let source_path = env.worktree_path("sym-source");
+    let target_path = env.worktree_path("sym-target");
+
+    // Add a symlink pattern to the repo config *after* worktrees already exist,
+    // and create the matching file only now (mirrors the openspec-init scenario).
+    create_worktree_config_with_symlinks(&env.repo_dir, &[], &["shared.md"])?;
+    source_path.child("shared.md").write_str("shared content")?;
+
+    env.run_command(&["sync", "sym-source", "sym-target"])?
+        .assert()
+        .success();
+
+    let link = target_path.child("shared.md");
+    link.assert(predicate::path::exists());
+    let metadata = std::fs::symlink_metadata(link.path())?;
+    assert!(
+        metadata.file_type().is_symlink(),
+        "sync should create a symlink for a newly-added symlink pattern"
+    );
+
+    Ok(())
+}
+
+/// Test that `sync` force-relinks a path that already exists as a plain copy
+/// once it starts matching a symlink pattern.
+#[test]
+fn test_sync_relinks_existing_plain_copy() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    // Start with a copy-pattern only, so the file gets copied (not symlinked) on create.
+    create_worktree_config(&env.repo_dir, &["shared.md"], &[])?;
+
+    env.run_command(&["create", "relink-source", "feature/relink-source"])?
+        .assert()
+        .success();
+
+    let source_path = env.worktree_path("relink-source");
+    source_path.child("shared.md").write_str("origin content")?;
+
+    env.run_command(&["create", "relink-target", "feature/relink-target"])?
+        .assert()
+        .success();
+    let target_path = env.worktree_path("relink-target");
+
+    // First sync: plain copy (matches copy-pattern only).
+    env.run_command(&["sync", "relink-source", "relink-target"])?
+        .assert()
+        .success();
+
+    let link = target_path.child("shared.md");
+    let metadata_before = std::fs::symlink_metadata(link.path())?;
+    assert!(
+        !metadata_before.file_type().is_symlink(),
+        "shared.md should start as a plain copy"
+    );
+
+    // Now the same path also becomes a symlink-pattern match.
+    create_worktree_config_with_symlinks(&env.repo_dir, &["shared.md"], &["shared.md"])?;
+
+    env.run_command(&["sync", "relink-source", "relink-target"])?
+        .assert()
+        .success();
+
+    let metadata_after = std::fs::symlink_metadata(link.path())?;
+    assert!(
+        metadata_after.file_type().is_symlink(),
+        "sync should replace the existing plain copy with a symlink"
+    );
+
+    Ok(())
+}
+
+/// Test that broadcast mode (`sync` with no args) reaches every worktree of the current repo.
+#[test]
+fn test_sync_broadcast_reaches_all_worktrees_of_repo() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "broadcast-a", "feature/broadcast-a"])?
+        .assert()
+        .success();
+    env.run_command(&["create", "broadcast-b", "feature/broadcast-b"])?
+        .assert()
+        .success();
+
+    // Add config *after* both worktrees exist.
+    create_sample_config_files(&env.repo_dir)?;
+
+    // Run broadcast sync from inside the origin repo.
+    env.run_command(&["sync"])?.assert().success();
+
+    assert_config_files_copied(&env.worktree_path("broadcast-a"))?;
+    assert_config_files_copied(&env.worktree_path("broadcast-b"))?;
+
+    Ok(())
+}
+
+/// Test that broadcast mode run from inside a worktree still sources from that
+/// worktree's origin repo, not from the worktree itself.
+#[test]
+fn test_sync_broadcast_from_inside_worktree_uses_origin() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "inner-a", "feature/inner-a"])?
+        .assert()
+        .success();
+    env.run_command(&["create", "inner-b", "feature/inner-b"])?
+        .assert()
+        .success();
+
+    create_sample_config_files(&env.repo_dir)?;
+
+    let inner_a_path = env.worktree_path("inner-a");
+
+    // Run `sync` with cwd set to worktree inner-a instead of the origin repo.
+    let mut cmd = assert_cmd::Command::cargo_bin("worktree-bin")?;
+    cmd.current_dir(inner_a_path.path())
+        .env("WORKTREE_STORAGE_ROOT", env.storage_dir.path())
+        .arg("sync");
+    cmd.assert().success();
+
+    assert_config_files_copied(&env.worktree_path("inner-a"))?;
+    assert_config_files_copied(&env.worktree_path("inner-b"))?;
 
     Ok(())
 }

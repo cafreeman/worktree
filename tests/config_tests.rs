@@ -373,7 +373,7 @@ exclude = [".vscode/"]
         .write_str("{}")?;
 
     // Sync config
-    env.run_command(&["sync-config", "source", "target"])?
+    env.run_command(&["sync", "source", "target"])?
         .assert()
         .success();
 

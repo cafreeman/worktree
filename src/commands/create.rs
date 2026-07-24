@@ -98,7 +98,7 @@ fn create_worktree_internal(
     let config = WorktreeConfig::load_from_repo(&repo_path)?;
 
     // Create symlinks first (takes precedence over copy)
-    create_symlinks(&repo_path, &worktree_path, &config)?;
+    create_symlinks(&repo_path, &worktree_path, &config, false)?;
 
     // Copy config files, skipping any that are covered by symlinks
     copy_config_files(&repo_path, &worktree_path, &config)?;
@@ -120,12 +120,19 @@ fn create_worktree_internal(
 /// Creates symlinks in the worktree for patterns listed in `[symlink-patterns]`.
 /// Symlinks point to the absolute path in the origin repo.
 ///
+/// When `force` is `false` (worktree creation), any existing path at the target
+/// location is left untouched. When `force` is `true` (used by `sync`), a path
+/// that already exists as a plain file/dir (not a symlink) is replaced with the
+/// symlink; a path that is already a symlink is left untouched regardless of its
+/// target.
+///
 /// # Errors
 /// Returns an error if symlink creation fails for reasons other than missing origin path.
 pub fn create_symlinks(
     source_path: &Path,
     target_path: &Path,
     config: &WorktreeConfig,
+    force: bool,
 ) -> Result<()> {
     let patterns = match config.symlink_patterns.include.as_deref() {
         Some(p) if !p.is_empty() => p,
@@ -153,9 +160,33 @@ pub fn create_symlinks(
                     std::fs::create_dir_all(parent)?;
                 }
 
-                // Skip if already exists (e.g. already copied)
-                if target_link.exists() || target_link.symlink_metadata().is_ok() {
-                    continue;
+                if let Ok(existing_meta) = target_link.symlink_metadata() {
+                    // Already a symlink: leave it alone regardless of where it points.
+                    if existing_meta.file_type().is_symlink() {
+                        continue;
+                    }
+
+                    // A plain file/dir already exists. Without force, skip (e.g. already copied).
+                    if !force {
+                        continue;
+                    }
+
+                    // With force, replace the existing plain file/dir with the symlink.
+                    if existing_meta.is_dir() {
+                        std::fs::remove_dir_all(&target_link).with_context(|| {
+                            format!(
+                                "Failed to remove existing directory before relinking: {}",
+                                target_link.display()
+                            )
+                        })?;
+                    } else {
+                        std::fs::remove_file(&target_link).with_context(|| {
+                            format!(
+                                "Failed to remove existing file before relinking: {}",
+                                target_link.display()
+                            )
+                        })?;
+                    }
                 }
 
                 std::os::unix::fs::symlink(&canonical_source, &target_link).with_context(|| {
@@ -243,7 +274,7 @@ pub fn copy_config_files(
 }
 
 /// Checks if a file path is covered by any symlink pattern
-fn is_covered_by_symlink_pattern(
+pub(crate) fn is_covered_by_symlink_pattern(
     file_path: &Path,
     base_path: &Path,
     symlink_patterns: &[String],
@@ -331,7 +362,10 @@ pub fn run_on_create_hooks(worktree_path: &Path, config: &WorktreeConfig) -> Res
     Ok(())
 }
 
-fn find_matching_files(base_path: &Path, pattern: &str) -> Result<Option<Vec<std::path::PathBuf>>> {
+pub(crate) fn find_matching_files(
+    base_path: &Path,
+    pattern: &str,
+) -> Result<Option<Vec<std::path::PathBuf>>> {
     let mut matches = Vec::new();
 
     if pattern.contains('*') {
@@ -352,7 +386,7 @@ fn find_matching_files(base_path: &Path, pattern: &str) -> Result<Option<Vec<std
     }
 }
 
-fn should_exclude_file(file_path: &Path, exclude_patterns: &[String]) -> Result<bool> {
+pub(crate) fn should_exclude_file(file_path: &Path, exclude_patterns: &[String]) -> Result<bool> {
     let file_str = file_path.to_string_lossy();
 
     for pattern in exclude_patterns {
@@ -639,7 +673,7 @@ mod tests {
         fs::write(origin.join("shared-data.txt"), "content").unwrap();
 
         let config = make_config_with_symlinks(vec!["shared-data.txt".to_string()]);
-        create_symlinks(&origin, &worktree, &config).unwrap();
+        create_symlinks(&origin, &worktree, &config, false).unwrap();
 
         let link = worktree.join("shared-data.txt");
         assert!(link.symlink_metadata().is_ok(), "symlink should exist");
@@ -660,7 +694,7 @@ mod tests {
 
         // Pattern matches nothing in origin — should not error, should not create anything
         let config = make_config_with_symlinks(vec!["does-not-exist.txt".to_string()]);
-        let result = create_symlinks(&origin, &worktree, &config);
+        let result = create_symlinks(&origin, &worktree, &config, false);
 
         assert!(
             result.is_ok(),
@@ -695,7 +729,7 @@ mod tests {
         };
 
         // First create symlinks (as in create_worktree_internal)
-        create_symlinks(&origin, &worktree, &config).unwrap();
+        create_symlinks(&origin, &worktree, &config, false).unwrap();
         // Then copy (should skip .env because it's already symlinked)
         copy_config_files(&origin, &worktree, &config).unwrap();
 
@@ -704,6 +738,55 @@ mod tests {
         assert!(
             target.symlink_metadata().unwrap().file_type().is_symlink(),
             ".env should be a symlink, not a copy"
+        );
+    }
+
+    #[test]
+    fn test_create_symlinks_force_replaces_existing_plain_file() {
+        let tmp = TempDir::new().unwrap();
+        let origin = tmp.path().join("origin");
+        let worktree = tmp.path().join("worktree");
+        fs::create_dir_all(&origin).unwrap();
+        fs::create_dir_all(&worktree).unwrap();
+
+        fs::write(origin.join("shared.md"), "origin content").unwrap();
+        // Worktree already has a plain copy at this path (e.g. from an earlier copy-pattern sync)
+        fs::write(worktree.join("shared.md"), "stale local copy").unwrap();
+
+        let config = make_config_with_symlinks(vec!["shared.md".to_string()]);
+        create_symlinks(&origin, &worktree, &config, true).unwrap();
+
+        let link = worktree.join("shared.md");
+        assert!(
+            link.symlink_metadata().unwrap().file_type().is_symlink(),
+            "existing plain file should be replaced with a symlink when force=true"
+        );
+        assert_eq!(fs::read_to_string(&link).unwrap(), "origin content");
+    }
+
+    #[test]
+    fn test_create_symlinks_force_leaves_existing_symlink_untouched() {
+        let tmp = TempDir::new().unwrap();
+        let origin = tmp.path().join("origin");
+        let worktree = tmp.path().join("worktree");
+        let elsewhere = tmp.path().join("elsewhere.md");
+        fs::create_dir_all(&origin).unwrap();
+        fs::create_dir_all(&worktree).unwrap();
+
+        fs::write(origin.join("shared.md"), "origin content").unwrap();
+        fs::write(&elsewhere, "unrelated content").unwrap();
+
+        // Worktree already has a symlink pointing somewhere unexpected
+        std::os::unix::fs::symlink(&elsewhere, worktree.join("shared.md")).unwrap();
+
+        let config = make_config_with_symlinks(vec!["shared.md".to_string()]);
+        create_symlinks(&origin, &worktree, &config, true).unwrap();
+
+        let link = worktree.join("shared.md");
+        let target = fs::read_link(&link).unwrap();
+        assert_eq!(
+            target, elsewhere,
+            "existing symlink should be left untouched even with force=true, regardless of target"
         );
     }
 

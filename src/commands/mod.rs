@@ -7,4 +7,4 @@ pub mod list;
 pub mod remove;
 pub mod skill;
 pub mod status;
-pub mod sync_config;
+pub mod sync;

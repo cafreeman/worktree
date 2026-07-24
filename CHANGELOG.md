@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`worktree sync` broadcast mode:** Running `worktree sync` with no arguments syncs config files and symlinks from the current repo's origin to every worktree of that repo. Run from inside the origin repo or any of its worktrees.
+- **`sync` is now symlink-aware:** `[symlink-patterns]` matches are created (and, when a path already exists as a plain file/dir, replaced) as symlinks, not just copied. Previously only `[copy-patterns]` were synced.
+- **`worktree status` reports config drift:** For each managed worktree, flags `[symlink-patterns]` matches that are missing or present as a plain copy instead of a symlink, and `[copy-patterns]` matches that are missing. Prints a hint to run `worktree sync` when drift is found.
+
+### Changed
+
+- **BREAKING: `sync-config <from> <to>` renamed to `sync`.** The two-argument pairwise form still works (`worktree sync <from> <to>`), but `sync-config` no longer exists as a command name. `worktree sync` with no arguments now runs broadcast mode instead of requiring explicit arguments.
+
 ## [0.5.1] - 2026-04-02
 
 ### Added

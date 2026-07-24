@@ -52,7 +52,7 @@ cargo run -- <command>
 ### Module Structure
 - **main.rs**: CLI entry point using clap for argument parsing, dispatches to command modules
 - **lib.rs**: Library crate root, exposes all modules and the main `Result` type from anyhow
-- **commands/**: Individual command implementations (create, list, remove, status, sync_config, init, jump, back, cleanup)
+- **commands/**: Individual command implementations (create, list, remove, status, sync, init, jump, back, cleanup)
 - **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<feature-name>/` with feature name validation and origin tracking
 - **config/**: Handles `.worktree-config.toml` files for customizing copy patterns, symlink patterns, and on-create hooks
 - **git/**: Git operations wrapper using git2 crate, implements GitOperations trait

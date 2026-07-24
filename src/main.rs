@@ -2,9 +2,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use worktree::Result;
 use worktree::commands::init::Shell;
 use worktree::commands::skill::SkillAction;
-use worktree::commands::{
-    back, cleanup, create, init, jump, list, remove, skill, status, sync_config,
-};
+use worktree::commands::{back, cleanup, create, init, jump, list, remove, skill, status, sync};
 
 #[derive(Parser)]
 #[command(name = "worktree")]
@@ -62,14 +60,15 @@ enum Commands {
     },
     /// Show worktree status
     Status,
-    /// Sync config files between worktrees
-    SyncConfig {
-        /// Source branch or path
+    /// Sync config files and symlinks between worktrees.
+    /// With no arguments, broadcasts from the current repo's origin to all of its worktrees.
+    Sync {
+        /// Source branch or path (must be given together with `to`, or omit both to broadcast)
         #[arg(value_hint = ValueHint::Other)]
-        from: String,
-        /// Target branch or path
+        from: Option<String>,
+        /// Target branch or path (must be given together with `from`, or omit both to broadcast)
         #[arg(value_hint = ValueHint::Other)]
-        to: String,
+        to: Option<String>,
     },
     /// Generate shell integration for directory navigation
     Init {
@@ -188,8 +187,8 @@ fn main() -> Result<()> {
         Commands::Status => {
             status::show_status()?;
         }
-        Commands::SyncConfig { from, to } => {
-            sync_config::sync_config(&from, &to)?;
+        Commands::Sync { from, to } => {
+            sync::sync(from.as_deref(), to.as_deref())?;
         }
         Commands::Init { shell } => {
             init::generate_shell_integration(shell);

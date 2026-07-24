@@ -9,5 +9,6 @@ pub mod test_env;
 // Re-export commonly used items for convenience
 pub use patterns::{
     assert_config_files_copied, create_sample_config_files, create_worktree_config,
+    create_worktree_config_with_symlinks,
 };
 pub use test_env::CliTestEnvironment;

@@ -180,7 +180,7 @@ _worktree_complete() {{
             COMP_WORDS=("${{saved_comp_words[@]}}")
         else
             # Fallback to basic completion
-            COMPREPLY=($(compgen -W "create list ls remove status sync-config jump switch back init completions cleanup --help --version" -- "$cur"))
+            COMPREPLY=($(compgen -W "create list ls remove status sync jump switch back init completions cleanup --help --version" -- "$cur"))
         fi
     fi
 }}
@@ -396,7 +396,7 @@ _worktree() {{
                         'ls:List worktrees (alias for list)'
                         'remove:Remove a worktree'
                         'status:Show worktree status'
-                        'sync-config:Sync config files between worktrees'
+                        'sync:Sync config files and symlinks between worktrees'
                         'jump:Jump to a worktree directory'
                         'switch:Switch to a worktree directory (alias for jump)'
                         'back:Navigate back to the original repository'

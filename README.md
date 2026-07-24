@@ -76,7 +76,7 @@ worktree skill uninstall  # Remove if no longer needed
 | `switch [feature-name]`        | Alias for `jump`                                               |
 | `remove [feature-name]`        | Remove a worktree (interactive if no name specified)           |
 | `status`                       | Show detailed status of current worktree and branches          |
-| `sync-config <from> <to>`      | Copy config files between worktrees                            |
+| `sync [from] [to]`             | Sync config files and symlinks; broadcasts origin → all worktrees of the repo if no args given, or between a specific pair if both given |
 | `back`                         | Return to the original repository                              |
 | `cleanup`                      | Clean up orphaned worktree references                          |
 | `skill <install\|uninstall\|update\|status>` | Manage the companion agent skill             |
@@ -142,7 +142,10 @@ worktree list
 worktree status
 
 # Sync config changes from one worktree to another
-worktree sync-config auth payments
+worktree sync auth payments
+
+# Or broadcast config from the origin repo to every worktree of this repo
+worktree sync
 
 # Remove a worktree — branch is preserved by default
 worktree remove security
@@ -258,15 +261,21 @@ If no config file exists, these patterns are used:
 
 ### Config File Synchronization
 
-Sync configuration changes between worktrees without manual copying:
+Sync configuration changes (including symlinks) between worktrees without manual copying:
 
 ```bash
+# Broadcast config from the origin repo to every worktree of this repo
+worktree sync
+
 # Copy config files from the auth worktree to the payments worktree
-worktree sync-config auth payments
+worktree sync auth payments
 
 # Also accepts absolute paths
-worktree sync-config ~/.worktrees/my-project/auth ~/.worktrees/my-project/payments
+worktree sync ~/.worktrees/my-project/auth ~/.worktrees/my-project/payments
 ```
+
+`worktree status` reports any worktree whose config or symlinks have drifted from
+what `.worktree-config.toml` expects, and suggests running `worktree sync` to fix it.
 
 ### Cleanup Operations
 

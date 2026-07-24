@@ -49,7 +49,7 @@ Integration tests are organized by command functionality:
 - `tests/remove_tests.rs` - Worktree removal and cleanup
 - `tests/list_tests.rs` - Listing and status commands
 - `tests/status_tests.rs` - Status reporting
-- `tests/sync_config_tests.rs` - Configuration synchronization
+- `tests/sync_tests.rs` - Configuration and symlink synchronization (pairwise and broadcast)
 - `tests/workflow_tests.rs` - End-to-end user workflows
 - `tests/parallel_safety_tests.rs` - Concurrent test execution safety
 - `tests/completion_tests.rs` - Shell completion functionality

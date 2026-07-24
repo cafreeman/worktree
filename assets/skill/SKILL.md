@@ -123,13 +123,19 @@ Show detailed status of the current worktree including git alignment info.
 worktree status
 ```
 
-### `worktree sync-config <from> <to>`
+### `worktree sync [from] [to]`
 
-Copy config files (as defined in `.worktree-config.toml`) from one worktree to another.
-Accepts feature names or absolute paths.
+Sync config files and symlinks (as defined in `.worktree-config.toml`). With no
+arguments, broadcasts from the current repo's origin to every worktree of that
+repo. With both `from` and `to` given (feature names or absolute paths), syncs
+that specific pair.
 
 ```bash
-worktree sync-config auth-redesign payments
+# Broadcast to every worktree of the current repo
+worktree sync
+
+# Sync a specific pair
+worktree sync auth-redesign payments
 ```
 
 ### `worktree cleanup`
