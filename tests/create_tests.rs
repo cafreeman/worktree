@@ -112,30 +112,38 @@ fn test_create_worktree_smart_mode_existing_branch() -> Result<()> {
     Ok(())
 }
 
-/// Test git configuration inheritance in created worktrees
+/// Test that creating a worktree does not mutate the origin repo's git config.
+/// Git config inheritance was removed: linked worktrees share the repo's
+/// config natively, and the old inheritance duplicated global gitconfig
+/// values into the origin repo's local config.
 #[test]
-fn test_git_config_inheritance() -> Result<()> {
+fn test_create_leaves_origin_git_config_untouched() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    std::process::Command::new("git")
-        .args(["config", "core.editor", "nano"])
-        .current_dir(env.repo_dir.path())
-        .output()?;
+    let config_path = env.repo_dir.path().join(".git").join("config");
+    let before = std::fs::read_to_string(&config_path)?;
 
-    env.run_command(&["create", "config-inherit", "feature/config-inherit"])?
+    env.run_command(&["create", "no-inherit", "feature/no-inherit"])?
         .assert()
         .success();
 
-    let worktree_path = env.worktree_path("config-inherit");
-    worktree_path.assert(predicate::path::exists());
+    let after = std::fs::read_to_string(&config_path)?;
+    assert_eq!(
+        before, after,
+        "create must not modify the origin repo's .git/config"
+    );
 
-    let output = std::process::Command::new("git")
-        .args(["config", "extensions.worktreeConfig"])
-        .current_dir(env.repo_dir.path())
-        .output()?;
-
-    let config_value = String::from_utf8(output.stdout)?;
-    assert_eq!(config_value.trim(), "true");
+    // No worktree-specific config file must be created either
+    let worktree_admin = env
+        .repo_dir
+        .path()
+        .join(".git")
+        .join("worktrees")
+        .join("no-inherit");
+    assert!(
+        !worktree_admin.join("config.worktree").exists(),
+        "create must not create a config.worktree"
+    );
 
     Ok(())
 }
