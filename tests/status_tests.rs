@@ -3,6 +3,7 @@
 //! These tests validate the status command CLI behavior using real command execution.
 
 use anyhow::Result;
+use std::process::Command;
 
 use test_support::CliTestEnvironment;
 
@@ -79,6 +80,48 @@ fn test_status_basic() -> Result<()> {
 
     // Status command should work
     env.run_command(&["status"])?.assert().success();
+
+    Ok(())
+}
+
+#[test]
+fn test_status_reports_foreign_worktree_as_unmanaged() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    let foreign_path = env
+        .repo_dir
+        .path()
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("test repository has no parent"))?
+        .join("foreign-worktree");
+
+    let output = Command::new("git")
+        .args([
+            "worktree",
+            "add",
+            "--detach",
+            foreign_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("foreign path is not UTF-8"))?,
+            "HEAD",
+        ])
+        .current_dir(env.repo_dir.path())
+        .output()?;
+    assert!(
+        output.status.success(),
+        "failed to create foreign worktree: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let status = get_stdout(&env, &["status"])?;
+    assert!(status.contains("unmanaged"));
+    assert!(
+        status.contains(
+            foreign_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("foreign path is not UTF-8"))?
+        )
+    );
+    assert!(!status.contains("✗ foreign-worktree"));
 
     Ok(())
 }

@@ -24,19 +24,6 @@ pub fn create_worktree(feature_name: &str, branch: Option<&str>, from: Option<&s
     create_worktree_internal(&git_repo, feature_name, branch, from)
 }
 
-/// Test version that accepts a mock git repository
-///
-/// # Errors
-/// Returns an error if worktree creation fails
-pub fn create_worktree_with_git(
-    git_repo: &dyn crate::traits::GitOperations,
-    feature_name: &str,
-    branch: Option<&str>,
-    from: Option<&str>,
-) -> Result<()> {
-    create_worktree_internal(git_repo, feature_name, branch, from)
-}
-
 fn create_worktree_internal(
     git_repo: &dyn crate::traits::GitOperations,
     feature_name: &str,

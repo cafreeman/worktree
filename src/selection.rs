@@ -2,7 +2,6 @@ use anyhow::Result;
 use inquire::{Select, Text, validator::Validation};
 use std::error::Error;
 use std::fmt;
-use std::path::PathBuf;
 
 use crate::git::GitRepo;
 
@@ -184,36 +183,6 @@ impl SelectionProvider for MockSelectionProvider {
     }
 }
 
-/// Helper function to parse path from selection string formatted as "repo/branch (path)"
-///
-/// # Errors
-/// Returns an error if the selection string is not in the expected format
-pub fn extract_path_from_selection(selection: &str) -> Result<PathBuf> {
-    if let Some(path_start) = selection.rfind(" (") {
-        let path_str = &selection[path_start + 2..selection.len() - 1];
-        Ok(PathBuf::from(path_str))
-    } else {
-        anyhow::bail!("Invalid selection format: {}", selection)
-    }
-}
-
-/// Helper function to extract branch name from selection string formatted as "repo/branch (path)"
-///
-/// # Errors
-/// Returns an error if the selection string is not in the expected format
-pub fn extract_branch_from_selection(selection: &str) -> Result<String> {
-    if let Some(path_start) = selection.rfind(" (") {
-        let branch_part = &selection[..path_start];
-        if let Some(slash_pos) = branch_part.rfind('/') {
-            Ok(branch_part[slash_pos + 1..].to_string())
-        } else {
-            anyhow::bail!("Invalid selection format: {}", selection)
-        }
-    } else {
-        anyhow::bail!("Invalid selection format: {}", selection)
-    }
-}
-
 /// Select a git reference interactively using visual separators
 ///
 /// # Errors
@@ -285,18 +254,6 @@ pub fn select_git_reference_interactive(
     provider.select_grouped("Select git reference to create worktree from:", options)
 }
 
-/// Helper function to extract reference name from formatted selection
-///
-/// # Errors
-/// Returns an error if the selection string is not in expected format
-pub fn extract_reference_from_selection(selection: &str) -> Result<String> {
-    if let Some(space_pos) = selection.find(" (") {
-        Ok(selection[..space_pos].to_string())
-    } else {
-        anyhow::bail!("Invalid reference selection format: {}", selection)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,48 +274,6 @@ mod tests {
 
         let result = provider.select("Test prompt", options);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_path_from_selection() {
-        let selection = "repo/branch (/some/path)";
-        let result = extract_path_from_selection(selection);
-        assert!(matches!(result, Ok(ref p) if p == &PathBuf::from("/some/path")));
-    }
-
-    #[test]
-    fn test_extract_branch_from_selection() {
-        let selection = "repo/feature-branch (/some/path)";
-        let result = extract_branch_from_selection(selection);
-        assert!(matches!(result, Ok(ref b) if b == "feature-branch"));
-    }
-
-    #[test]
-    fn test_extract_from_invalid_selection() {
-        let invalid_selection = "invalid format";
-        assert!(extract_path_from_selection(invalid_selection).is_err());
-        assert!(extract_branch_from_selection(invalid_selection).is_err());
-    }
-
-    #[test]
-    fn test_extract_reference_from_selection() {
-        let selection = "main (local branch)";
-        let result = extract_reference_from_selection(selection);
-        assert!(matches!(result, Ok(ref s) if s == "main"));
-
-        let selection = "origin/feature (remote branch)";
-        let result = extract_reference_from_selection(selection);
-        assert!(matches!(result, Ok(ref s) if s == "origin/feature"));
-
-        let selection = "v1.0.0 (tag)";
-        let result = extract_reference_from_selection(selection);
-        assert!(matches!(result, Ok(ref s) if s == "v1.0.0"));
-    }
-
-    #[test]
-    fn test_extract_reference_from_invalid_selection() {
-        let invalid_selection = "invalid format";
-        assert!(extract_reference_from_selection(invalid_selection).is_err());
     }
 
     #[test]

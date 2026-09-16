@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use clap::Subcommand;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const EMBEDDED_SKILL: &str = include_str!("../../assets/skill/SKILL.md");
 
@@ -59,6 +59,12 @@ fn is_current() -> Result<bool> {
     Ok(installed == EMBEDDED_SKILL)
 }
 
+fn backup_skill_file(file: &Path) -> Result<()> {
+    let backup = file.with_file_name("SKILL.md.bak");
+    fs::copy(file, backup)?;
+    Ok(())
+}
+
 /// Installs the embedded skill into `~/.agents/skills/worktree-manager/` and
 /// creates a symlink at `~/.claude/skills/worktree-manager`.
 ///
@@ -74,7 +80,7 @@ pub fn install_skill() -> Result<()> {
             println!("✅ Skill is already installed and up to date.");
             return Ok(());
         }
-        // File exists but is outdated — still install (overwrite)
+        backup_skill_file(&file)?;
     }
 
     fs::create_dir_all(&dir)?;
@@ -166,6 +172,7 @@ pub fn update_skill() -> Result<()> {
     }
 
     let file = skill_file()?;
+    backup_skill_file(&file)?;
     fs::write(&file, EMBEDDED_SKILL)?;
     println!("✅ Skill updated at {}", file.display());
     Ok(())
@@ -259,6 +266,24 @@ mod tests {
     }
 
     #[test]
+    fn test_install_backs_up_outdated_skill() -> Result<()> {
+        with_temp_home(|| {
+            let dir = skill_dir()?;
+            fs::create_dir_all(&dir)?;
+            fs::write(dir.join("SKILL.md"), "user customizations")?;
+
+            install_skill()?;
+
+            assert_eq!(
+                fs::read_to_string(dir.join("SKILL.md.bak"))?,
+                "user customizations"
+            );
+            assert_eq!(fs::read_to_string(skill_file()?)?, EMBEDDED_SKILL);
+            Ok(())
+        })
+    }
+
+    #[test]
     fn test_uninstall_removes_files() -> Result<()> {
         with_temp_home(|| {
             let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home"))?;
@@ -294,6 +319,7 @@ mod tests {
             fs::write(dir.join("SKILL.md"), "old content")?;
 
             update_skill()?;
+            assert_eq!(fs::read_to_string(dir.join("SKILL.md.bak"))?, "old content");
             assert_eq!(fs::read_to_string(skill_file()?)?, EMBEDDED_SKILL);
             Ok(())
         })

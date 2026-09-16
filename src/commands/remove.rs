@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::commands::shared::get_available_worktrees;
 use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
 use crate::selection::{RealSelectionProvider, SelectionProvider};
@@ -393,41 +394,6 @@ fn select_worktree_for_removal(
 
     let (_, feature_name, path) = &worktrees[index];
     Ok((path.clone(), feature_name.clone()))
-}
-
-fn get_available_worktrees(
-    storage: &WorktreeStorage,
-    current_repo_only: bool,
-) -> Result<Vec<(String, String, PathBuf)>> {
-    let mut worktrees = Vec::new();
-
-    if current_repo_only {
-        let current_dir = std::env::current_dir()?;
-        if let Ok(git_repo) = GitRepo::open(&current_dir) {
-            let repo_path = git_repo.get_repo_path()?;
-            let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
-
-            let repo_worktrees = storage.list_repo_worktrees(&repo_name)?;
-            for feature_name in repo_worktrees {
-                let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
-                if worktree_path.exists() {
-                    worktrees.push((repo_name.clone(), feature_name, worktree_path));
-                }
-            }
-        }
-    } else {
-        let all_worktrees = storage.list_all_worktrees()?;
-        for (repo_name, repo_worktrees) in all_worktrees {
-            for feature_name in repo_worktrees {
-                let worktree_path = storage.get_worktree_path(&repo_name, &feature_name);
-                if worktree_path.exists() {
-                    worktrees.push((repo_name.clone(), feature_name, worktree_path));
-                }
-            }
-        }
-    }
-
-    Ok(worktrees)
 }
 
 #[cfg(test)]

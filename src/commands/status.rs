@@ -49,26 +49,32 @@ pub fn show_status() -> Result<()> {
     println!("Repository path: {}", repo_path.display());
     println!();
 
-    let git_worktrees = git_repo.list_worktrees()?;
+    let git_worktrees = git_repo.list_worktrees_with_paths()?;
     let managed_worktrees = storage.list_repo_worktrees(&repo_name)?;
 
     let config = WorktreeConfig::load_from_repo(repo_path)?;
 
     println!("Git worktrees ({}):", git_worktrees.len());
-    for worktree in &git_worktrees {
-        let worktree_path = storage.get_worktree_path(&repo_name, worktree);
-        let managed = if managed_worktrees.contains(worktree) {
-            "📁"
-        } else {
-            "⚠"
-        };
+    for (worktree, worktree_path, _) in &git_worktrees {
+        let expected_path = storage.get_worktree_path(&repo_name, worktree);
+        let managed =
+            if managed_worktrees.contains(worktree) && paths_match(worktree_path, &expected_path) {
+                "📁"
+            } else {
+                "⚠"
+            };
         let exists = if worktree_path.exists() { "✓" } else { "✗" };
+        let name = if managed == "📁" {
+            worktree.clone()
+        } else {
+            format!("{worktree} (unmanaged)")
+        };
 
         println!(
             "  {} {} {} ({})",
             managed,
             exists,
-            worktree,
+            name,
             worktree_path.display()
         );
     }
@@ -78,7 +84,10 @@ pub fn show_status() -> Result<()> {
     let mut any_drift = false;
     for worktree in &managed_worktrees {
         let worktree_path = storage.get_worktree_path(&repo_name, worktree);
-        let in_git = if git_worktrees.contains(worktree) {
+        let in_git = if git_worktrees
+            .iter()
+            .any(|(name, path, _)| name == worktree && paths_match(path, &worktree_path))
+        {
             "🔗"
         } else {
             "⚠"
@@ -118,6 +127,13 @@ pub fn show_status() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn paths_match(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
 }
 
 /// Detects config drift for a single worktree against the origin repo's config patterns.

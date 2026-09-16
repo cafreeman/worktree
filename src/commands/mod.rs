@@ -5,6 +5,7 @@ pub mod init;
 pub mod jump;
 pub mod list;
 pub mod remove;
+pub mod shared;
 pub mod skill;
 pub mod status;
 pub mod sync;

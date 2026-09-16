@@ -3,6 +3,9 @@
 //! These tests validate the list command CLI behavior using real command execution.
 
 use anyhow::Result;
+use assert_cmd::Command;
+use predicates::prelude::*;
+use tempfile::TempDir;
 
 use test_support::CliTestEnvironment;
 
@@ -99,6 +102,22 @@ fn test_list_current_repo() -> Result<()> {
         output.contains("current-test"),
         "List --current should show current repo worktrees"
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_list_current_outside_git_repository_fails() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    let outside = TempDir::new()?;
+
+    Command::cargo_bin("worktree-bin")?
+        .current_dir(outside.path())
+        .env("WORKTREE_STORAGE_ROOT", env.storage_dir.path())
+        .args(["list", "--current"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Failed to find git repository"));
 
     Ok(())
 }
