@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-16
+
 ### Added
 
 - **`worktree doctor`:** Reports missing, stale, malformed, duplicate, and
@@ -301,7 +303,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper cleanup of git references and filesystem state
   - Cross-platform path handling and symlink resolution
 
-[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/cafreeman/worktree/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/cafreeman/worktree/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/cafreeman/worktree/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/cafreeman/worktree/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/cafreeman/worktree/compare/v0.4.0...v0.5.0
