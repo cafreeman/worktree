@@ -50,7 +50,7 @@ pub fn remove_worktree_with_provider(
 
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    let repo_path = git_repo.get_repo_path();
+    let repo_path = git_repo.get_repo_path()?;
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     let (worktree_path, feature_name) = if interactive || target.is_none() {
@@ -212,7 +212,7 @@ fn get_available_worktrees(
     if current_repo_only {
         let current_dir = std::env::current_dir()?;
         if let Ok(git_repo) = GitRepo::open(&current_dir) {
-            let repo_path = git_repo.get_repo_path();
+            let repo_path = git_repo.get_repo_path()?;
             let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
             let repo_worktrees = storage.list_repo_worktrees(&repo_name)?;

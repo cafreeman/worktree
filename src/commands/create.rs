@@ -48,7 +48,7 @@ fn create_worktree_internal(
 
     let branch_name = branch.unwrap_or(feature_name);
 
-    let repo_path = git_repo.get_repo_path();
+    let repo_path = git_repo.get_repo_path()?;
     let storage = WorktreeStorage::new()?;
     let repo_name = WorktreeStorage::get_repo_name(&repo_path)?;
     let worktree_path = storage.get_worktree_path(&repo_name, feature_name);

@@ -22,7 +22,7 @@ pub fn list_worktrees(current_repo_only: bool) -> Result<()> {
 fn list_current_repo_worktrees(storage: &WorktreeStorage) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    let repo_path = git_repo.get_repo_path();
+    let repo_path = git_repo.get_repo_path()?;
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     println!("Worktrees for repository: {}", repo_name);

@@ -33,7 +33,7 @@ pub fn sync(from: Option<&str>, to: Option<&str>) -> Result<()> {
 fn sync_pair_by_name(from: &str, to: &str) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    let repo_path = git_repo.get_repo_path();
+    let repo_path = git_repo.get_repo_path()?;
 
     let storage = WorktreeStorage::new()?;
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
@@ -112,7 +112,7 @@ fn resolve_repo_origin(current_dir: &Path, storage: &WorktreeStorage) -> Result<
 
     // Not inside a managed worktree — treat the current directory as the origin repo itself.
     let git_repo = GitRepo::open(current_dir)?;
-    let repo_path = git_repo.get_repo_path();
+    let repo_path = git_repo.get_repo_path()?;
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
     Ok((repo_name, repo_path.to_path_buf()))

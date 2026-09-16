@@ -3,7 +3,14 @@ use std::path::{Path, PathBuf};
 
 /// Trait for Git operations to enable mocking in tests
 pub trait GitOperations {
-    fn get_repo_path(&self) -> PathBuf;
+    /// Returns the working directory of the main repository.
+    ///
+    /// When discovered from inside a linked worktree, this is the original
+    /// repository's directory, not the worktree's own directory.
+    ///
+    /// # Errors
+    /// Returns an error for bare repositories (they have no working directory).
+    fn get_repo_path(&self) -> Result<PathBuf>;
     /// Checks if a branch exists in the repository
     ///
     /// # Errors

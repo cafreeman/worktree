@@ -21,9 +21,37 @@ impl GitRepo {
         Ok(Self { repo })
     }
 
-    #[must_use]
-    pub fn get_repo_path(&self) -> &Path {
-        self.repo.workdir().unwrap_or_else(|| self.repo.path())
+    /// Returns the working directory of the main repository.
+    ///
+    /// When discovered from inside a linked worktree, this is the original
+    /// repository's directory, not the worktree's own directory. Storage
+    /// naming, origin tracking, and config loading all key off the main
+    /// repository, so they stay consistent no matter where a command runs.
+    ///
+    /// # Errors
+    /// Returns an error for bare repositories (they have no working directory).
+    pub fn get_repo_path(&self) -> Result<&Path> {
+        if self.repo.is_bare() {
+            anyhow::bail!("Bare repositories are not supported (no working directory)");
+        }
+
+        // commondir() points at the main repo's .git directory both from the
+        // main repo itself and from any linked worktree; its parent is the
+        // main working directory.
+        let common_git_dir = self.repo.commondir();
+
+        // A linked worktree of a bare main repo has no main working directory
+        // either; commondir's parent would be the directory CONTAINING the
+        // bare repo, which is not a worktree of anything.
+        if let Ok(main_repo) = Repository::open(common_git_dir) {
+            if main_repo.is_bare() {
+                anyhow::bail!("Bare repositories are not supported (no working directory)");
+            }
+        }
+
+        common_git_dir
+            .parent()
+            .context("Failed to determine main repository working directory")
     }
 
     /// Checks if a branch exists in the repository
@@ -397,8 +425,8 @@ fn should_inherit_config_key(key: &str) -> bool {
 }
 
 impl GitOperations for GitRepo {
-    fn get_repo_path(&self) -> PathBuf {
-        self.get_repo_path().to_path_buf()
+    fn get_repo_path(&self) -> Result<PathBuf> {
+        Ok(self.get_repo_path()?.to_path_buf())
     }
 
     fn branch_exists(&self, branch_name: &str) -> Result<bool> {
