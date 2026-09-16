@@ -19,9 +19,23 @@ use crate::storage::WorktreeStorage;
 /// - The worktree path already exists
 /// - Git operations fail
 pub fn create_worktree(feature_name: &str, branch: Option<&str>, from: Option<&str>) -> Result<()> {
+    create_worktree_with_links(feature_name, branch, from, &[])
+}
+
+/// Creates a worktree with one-off symlink patterns in addition to repository
+/// configuration.
+///
+/// # Errors
+/// Returns an error if worktree creation or link setup fails.
+pub fn create_worktree_with_links(
+    feature_name: &str,
+    branch: Option<&str>,
+    from: Option<&str>,
+    link_patterns: &[String],
+) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
-    create_worktree_internal(&git_repo, feature_name, branch, from)
+    create_worktree_internal(&git_repo, feature_name, branch, from, link_patterns)
 }
 
 fn create_worktree_internal(
@@ -29,6 +43,7 @@ fn create_worktree_internal(
     feature_name: &str,
     branch: Option<&str>,
     from: Option<&str>,
+    link_patterns: &[String],
 ) -> Result<()> {
     // Validate feature name
     WorktreeStorage::validate_feature_name(feature_name)?;
@@ -76,10 +91,10 @@ fn create_worktree_internal(
     let config = WorktreeConfig::load_from_repo(&repo_path)?;
 
     // Create symlinks first (takes precedence over copy)
-    create_symlinks(&repo_path, &worktree_path, &config, false)?;
+    create_symlinks_with_patterns(&repo_path, &worktree_path, &config, false, link_patterns)?;
 
     // Copy config files, skipping any that are covered by symlinks
-    copy_config_files(&repo_path, &worktree_path, &config)?;
+    copy_config_files_with_symlinks(&repo_path, &worktree_path, &config, link_patterns)?;
 
     // Store origin information for back navigation
     store_origin_info(&storage, &repo_name, feature_name, &repo_path)?;
@@ -112,10 +127,29 @@ pub fn create_symlinks(
     config: &WorktreeConfig,
     force: bool,
 ) -> Result<()> {
-    let patterns = match config.symlink_patterns.include.as_deref() {
-        Some(p) if !p.is_empty() => p,
-        _ => return Ok(()),
-    };
+    create_symlinks_with_patterns(source_path, target_path, config, force, &[])
+}
+
+/// Creates configured and one-off symlinks in a worktree.
+///
+/// # Errors
+/// Returns an error if symlink creation fails for reasons other than missing origin path.
+pub fn create_symlinks_with_patterns(
+    source_path: &Path,
+    target_path: &Path,
+    config: &WorktreeConfig,
+    force: bool,
+    extra_patterns: &[String],
+) -> Result<()> {
+    let configured_patterns = config.symlink_patterns.include.as_deref().unwrap_or(&[]);
+    if configured_patterns.is_empty() && extra_patterns.is_empty() {
+        return Ok(());
+    }
+    let patterns: Vec<&str> = configured_patterns
+        .iter()
+        .map(String::as_str)
+        .chain(extra_patterns.iter().map(String::as_str))
+        .collect();
 
     println!("Creating symlinks...");
 
@@ -202,9 +236,24 @@ pub fn copy_config_files(
     target_path: &Path,
     config: &WorktreeConfig,
 ) -> Result<()> {
+    copy_config_files_with_symlinks(source_path, target_path, config, &[])
+}
+
+/// Copies configuration files while treating one-off symlink patterns as
+/// higher precedence than copy patterns.
+///
+/// # Errors
+/// Returns an error if file operations fail.
+pub fn copy_config_files_with_symlinks(
+    source_path: &Path,
+    target_path: &Path,
+    config: &WorktreeConfig,
+    extra_symlink_patterns: &[String],
+) -> Result<()> {
     println!("Copying configuration files...");
 
-    let symlink_patterns = config.symlink_patterns.include.as_deref().unwrap_or(&[]);
+    let mut symlink_patterns = config.symlink_patterns.include.clone().unwrap_or_default();
+    symlink_patterns.extend(extra_symlink_patterns.iter().cloned());
 
     for pattern in config.copy_patterns.include.as_deref().unwrap_or_default() {
         if let Some(matches) = find_matching_files(source_path, pattern)? {
@@ -218,7 +267,7 @@ pub fn copy_config_files(
                 }
 
                 // Skip if already covered by a symlink pattern
-                if is_covered_by_symlink_pattern(&source_file, source_path, symlink_patterns) {
+                if is_covered_by_symlink_pattern(&source_file, source_path, &symlink_patterns) {
                     continue;
                 }
 
@@ -490,13 +539,25 @@ pub fn list_git_ref_completions() -> Result<()> {
 /// # Errors
 /// Returns an error if interactive selection fails.
 pub fn interactive_from_selection(feature_name: &str, branch: Option<&str>) -> Result<()> {
+    interactive_from_selection_with_links(feature_name, branch, &[])
+}
+
+/// Selects a starting reference and creates a worktree with extra symlink patterns.
+///
+/// # Errors
+/// Returns an error if interactive selection or worktree creation fails.
+pub fn interactive_from_selection_with_links(
+    feature_name: &str,
+    branch: Option<&str>,
+    link_patterns: &[String],
+) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
 
     let provider = RealSelectionProvider;
     let selected_ref = select_git_reference_interactive(&git_repo, &provider)?;
 
-    create_worktree(feature_name, branch, Some(&selected_ref))?;
+    create_worktree_with_links(feature_name, branch, Some(&selected_ref), link_patterns)?;
 
     Ok(())
 }
@@ -614,6 +675,17 @@ pub fn interactive_create_workflow() -> Result<()> {
 /// # Errors
 /// Returns an error if interactive prompts fail or worktree creation fails.
 pub fn interactive_create_with_feature(feature_name: &str) -> Result<()> {
+    interactive_create_with_feature_and_links(feature_name, &[])
+}
+
+/// Runs the feature-known interactive workflow with one-off symlink patterns.
+///
+/// # Errors
+/// Returns an error if interactive prompts or worktree creation fail.
+pub fn interactive_create_with_feature_and_links(
+    feature_name: &str,
+    link_patterns: &[String],
+) -> Result<()> {
     let provider = RealSelectionProvider;
 
     // Validate feature name first
@@ -635,7 +707,12 @@ pub fn interactive_create_with_feature(feature_name: &str) -> Result<()> {
         None
     };
 
-    create_worktree(feature_name, Some(&branch_name), from_ref.as_deref())?;
+    create_worktree_with_links(
+        feature_name,
+        Some(&branch_name),
+        from_ref.as_deref(),
+        link_patterns,
+    )?;
 
     Ok(())
 }
@@ -648,6 +725,18 @@ pub fn interactive_create_with_feature(feature_name: &str) -> Result<()> {
 /// # Errors
 /// Returns an error if interactive prompts fail or worktree creation fails.
 pub fn interactive_create_with_feature_and_from(feature_name: &str, from_ref: &str) -> Result<()> {
+    interactive_create_with_feature_and_from_and_links(feature_name, from_ref, &[])
+}
+
+/// Prompts for a branch and creates it from a reference with extra symlinks.
+///
+/// # Errors
+/// Returns an error if the prompt or worktree creation fails.
+pub fn interactive_create_with_feature_and_from_and_links(
+    feature_name: &str,
+    from_ref: &str,
+    link_patterns: &[String],
+) -> Result<()> {
     let provider = RealSelectionProvider;
 
     WorktreeStorage::validate_feature_name(feature_name)?;
@@ -658,7 +747,12 @@ pub fn interactive_create_with_feature_and_from(feature_name: &str, from_ref: &s
     );
     let branch_name = provider.get_text_input(&prompt, Some(validate_branch_name))?;
 
-    create_worktree(feature_name, Some(&branch_name), Some(from_ref))?;
+    create_worktree_with_links(
+        feature_name,
+        Some(&branch_name),
+        Some(from_ref),
+        link_patterns,
+    )?;
 
     Ok(())
 }

@@ -1,6 +1,7 @@
 pub mod back;
 pub mod cleanup;
 pub mod create;
+pub mod doctor;
 pub mod init;
 pub mod jump;
 pub mod list;

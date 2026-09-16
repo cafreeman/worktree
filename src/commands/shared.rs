@@ -1,13 +1,26 @@
 //! Helpers shared by multiple command implementations.
 
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
 /// Describes an available worktree: `(repo name, feature name, path)`.
 pub type AvailableWorktree = (String, String, PathBuf);
+
+/// Canonicalizes a path for comparisons, falling back to the original path
+/// when it does not exist yet.
+#[must_use]
+pub fn canonical_or_raw(path: PathBuf) -> PathBuf {
+    path.canonicalize().unwrap_or(path)
+}
+
+/// Compares paths while tolerating platform-specific symlink canonicalization.
+#[must_use]
+pub fn paths_match(left: &Path, right: &Path) -> bool {
+    canonical_or_raw(left.to_path_buf()) == canonical_or_raw(right.to_path_buf())
+}
 
 /// Lists available (on-disk) worktrees: for the current repository only, or
 /// across all repositories in storage.

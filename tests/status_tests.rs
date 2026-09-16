@@ -125,3 +125,21 @@ fn test_status_reports_foreign_worktree_as_unmanaged() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_status_json_contains_registration_and_drift_fields() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.run_command(&["create", "json-status", "feature/json-status"])?
+        .assert()
+        .success();
+
+    let output = get_stdout(&env, &["status", "--json"])?;
+    let json: serde_json::Value = serde_json::from_str(&output)?;
+    assert_eq!(json["repository"], "test_repo");
+    assert!(json["git_worktrees"].is_array());
+    assert_eq!(json["managed_worktrees"][0]["feature"], "json-status");
+    assert_eq!(json["managed_worktrees"][0]["registered"], true);
+    assert!(json["managed_worktrees"][0]["drift"].is_array());
+
+    Ok(())
+}

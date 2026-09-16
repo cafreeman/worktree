@@ -128,6 +128,37 @@ fn test_create_from_requires_feature_name() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_create_link_adds_one_off_symlink() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child("agent-state.md")
+        .write_str("agent state")?;
+
+    env.run_command(&[
+        "create",
+        "linked-state",
+        "feature/linked-state",
+        "--link",
+        "agent-state.md",
+    ])?
+    .assert()
+    .success();
+
+    let link = env
+        .worktree_path("linked-state")
+        .path()
+        .join("agent-state.md");
+    let metadata = std::fs::symlink_metadata(&link)?;
+    assert!(metadata.file_type().is_symlink());
+    assert_eq!(
+        std::fs::read_link(link)?,
+        env.repo_dir.path().join("agent-state.md").canonicalize()?
+    );
+
+    Ok(())
+}
+
 /// --interactive-from conflicts with --from (enforced by clap)
 #[test]
 fn test_create_interactive_from_conflicts_with_from() -> Result<()> {

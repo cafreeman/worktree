@@ -1,31 +1,59 @@
 use anyhow::Result;
+use serde::Serialize;
 use std::path::Path;
 
 use crate::commands::create;
+use crate::commands::shared::paths_match;
 use crate::config::WorktreeConfig;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
 
 /// A single piece of config drift detected for a managed worktree.
-struct DriftEntry {
-    relative_path: String,
-    kind: DriftKind,
+pub(crate) struct DriftEntry {
+    pub(crate) relative_path: String,
+    pub(crate) kind: DriftKind,
 }
 
-enum DriftKind {
+pub(crate) enum DriftKind {
     MissingSymlink,
     CopyInsteadOfSymlink,
     MissingCopy,
 }
 
 impl DriftKind {
-    fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> &'static str {
         match self {
             DriftKind::MissingSymlink => "not linked (expected symlink)",
             DriftKind::CopyInsteadOfSymlink => "copy exists, should be symlink",
             DriftKind::MissingCopy => "missing (copy-pattern)",
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct StatusOutput {
+    pub(crate) repository: String,
+    pub(crate) repository_path: String,
+    pub(crate) git_worktrees: Vec<GitWorktreeOutput>,
+    pub(crate) managed_worktrees: Vec<ManagedWorktreeOutput>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct GitWorktreeOutput {
+    pub(crate) name: String,
+    pub(crate) path: String,
+    pub(crate) exists: bool,
+    pub(crate) managed: bool,
+    pub(crate) prunable: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ManagedWorktreeOutput {
+    pub(crate) feature: String,
+    pub(crate) path: String,
+    pub(crate) exists: bool,
+    pub(crate) registered: bool,
+    pub(crate) drift: Vec<String>,
 }
 
 /// Shows the status of all worktrees in the current repository
@@ -35,7 +63,7 @@ impl DriftKind {
 /// - Not in a git repository
 /// - Failed to access storage system
 /// - Git operations fail
-pub fn show_status() -> Result<()> {
+pub fn show_status(json: bool) -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let git_repo = GitRepo::open(&current_dir)?;
     let repo_path = git_repo.get_repo_path()?;
@@ -43,16 +71,29 @@ pub fn show_status() -> Result<()> {
     let storage = WorktreeStorage::new()?;
     let repo_name = WorktreeStorage::get_repo_name(repo_path)?;
 
+    let git_worktrees = git_repo.list_worktrees_with_paths()?;
+    let managed_worktrees = storage.list_repo_worktrees(&repo_name)?;
+
+    let config = WorktreeConfig::load_from_repo(repo_path)?;
+
+    if json {
+        let output = build_status_output(
+            &repo_name,
+            repo_path,
+            &git_worktrees,
+            &managed_worktrees,
+            &config,
+            &storage,
+        )?;
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
+    }
+
     println!("Git Worktree Status");
     println!("{}", "=".repeat(40));
     println!("Repository: {}", repo_name);
     println!("Repository path: {}", repo_path.display());
     println!();
-
-    let git_worktrees = git_repo.list_worktrees_with_paths()?;
-    let managed_worktrees = storage.list_repo_worktrees(&repo_name)?;
-
-    let config = WorktreeConfig::load_from_repo(repo_path)?;
 
     println!("Git worktrees ({}):", git_worktrees.len());
     for (worktree, worktree_path, _) in &git_worktrees {
@@ -129,18 +170,11 @@ pub fn show_status() -> Result<()> {
     Ok(())
 }
 
-fn paths_match(left: &Path, right: &Path) -> bool {
-    match (left.canonicalize(), right.canonicalize()) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => left == right,
-    }
-}
-
 /// Detects config drift for a single worktree against the origin repo's config patterns.
 ///
 /// # Errors
 /// Returns an error if pattern matching against the filesystem fails.
-fn detect_config_drift(
+pub(crate) fn detect_config_drift(
     repo_path: &Path,
     worktree_path: &Path,
     config: &WorktreeConfig,
@@ -209,6 +243,56 @@ fn detect_config_drift(
     }
 
     Ok(drift)
+}
+
+fn build_status_output(
+    repo_name: &str,
+    repo_path: &Path,
+    git_worktrees: &[(String, std::path::PathBuf, bool)],
+    managed_worktrees: &[String],
+    config: &WorktreeConfig,
+    storage: &WorktreeStorage,
+) -> Result<StatusOutput> {
+    let git_output = git_worktrees
+        .iter()
+        .map(|(name, path, prunable)| GitWorktreeOutput {
+            name: name.clone(),
+            path: path.display().to_string(),
+            exists: path.exists(),
+            managed: managed_worktrees.contains(name)
+                && paths_match(path, &storage.get_worktree_path(repo_name, name)),
+            prunable: *prunable,
+        })
+        .collect();
+
+    let mut managed_output = Vec::new();
+    for feature in managed_worktrees {
+        let path = storage.get_worktree_path(repo_name, feature);
+        let drift = if path.exists() {
+            detect_config_drift(repo_path, &path, config)?
+                .into_iter()
+                .map(|entry| format!("{}: {}", entry.relative_path, entry.kind.label()))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        managed_output.push(ManagedWorktreeOutput {
+            feature: feature.clone(),
+            path: path.display().to_string(),
+            exists: path.exists(),
+            registered: git_worktrees
+                .iter()
+                .any(|(name, git_path, _)| name == feature && paths_match(git_path, &path)),
+            drift,
+        });
+    }
+
+    Ok(StatusOutput {
+        repository: repo_name.to_string(),
+        repository_path: repo_path.display().to_string(),
+        git_worktrees: git_output,
+        managed_worktrees: managed_output,
+    })
 }
 
 #[cfg(test)]

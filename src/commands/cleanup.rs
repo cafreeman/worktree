@@ -1,16 +1,7 @@
-use anyhow::Result;
-use std::path::PathBuf;
-
+use crate::commands::shared::canonical_or_raw;
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
-
-/// Canonicalizes a path so comparisons survive symlinked locations
-/// (git canonicalizes worktree paths, e.g. /var -> /private/var on macOS,
-/// while storage paths are built raw). Falls back to the raw path when it
-/// doesn't exist on disk.
-fn canonical_or_raw(path: PathBuf) -> PathBuf {
-    path.canonicalize().unwrap_or(path)
-}
+use anyhow::Result;
 
 /// Cleans up orphaned worktree references and directories
 ///

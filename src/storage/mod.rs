@@ -5,6 +5,17 @@ pub struct WorktreeStorage {
     root_dir: PathBuf,
 }
 
+/// One parsed line from a repository's origin metadata file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorktreeOriginEntry {
+    /// Feature name, if the line uses the expected format.
+    pub feature_name: Option<String>,
+    /// Origin path, if the line uses the expected format.
+    pub origin_path: Option<String>,
+    /// Original line, retained for diagnostics.
+    pub raw_line: String,
+}
+
 impl WorktreeStorage {
     /// Creates a new WorktreeStorage instance
     ///
@@ -290,6 +301,64 @@ impl WorktreeStorage {
         Ok(None)
     }
 
+    /// Reads every line from a repository's origin metadata file.
+    ///
+    /// # Errors
+    /// Returns an error if the metadata file cannot be read.
+    pub fn list_worktree_origins(&self, repo_name: &str) -> Result<Vec<WorktreeOriginEntry>> {
+        let origin_mapping_file = self.root_dir.join(repo_name).join(".worktree-origins");
+
+        if !origin_mapping_file.exists() {
+            return Ok(Vec::new());
+        }
+
+        let content = std::fs::read_to_string(origin_mapping_file)?;
+        Ok(content
+            .lines()
+            .map(|raw_line| {
+                let (feature_name, origin_path) = raw_line
+                    .split_once(" -> ")
+                    .map(|(feature, origin)| (Some(feature.to_string()), Some(origin.to_string())))
+                    .unwrap_or((None, None));
+                WorktreeOriginEntry {
+                    feature_name,
+                    origin_path,
+                    raw_line: raw_line.to_string(),
+                }
+            })
+            .collect())
+    }
+
+    /// Rewrites a repository's origin metadata atomically.
+    ///
+    /// This is intentionally limited to well-formed entries so callers can
+    /// remove malformed and duplicate metadata during an explicit repair.
+    ///
+    /// # Errors
+    /// Returns an error if the metadata file cannot be written.
+    pub fn rewrite_worktree_origins(
+        &self,
+        repo_name: &str,
+        entries: &[(String, String)],
+    ) -> Result<()> {
+        let repo_dir = self.root_dir.join(repo_name);
+        std::fs::create_dir_all(&repo_dir)?;
+        let origin_mapping_file = repo_dir.join(".worktree-origins");
+        let mut content = entries
+            .iter()
+            .map(|(feature_name, origin_path)| format!("{feature_name} -> {origin_path}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !content.is_empty() {
+            content.push('\n');
+        }
+
+        let tmp_path = origin_mapping_file.with_extension("tmp");
+        std::fs::write(&tmp_path, content)?;
+        std::fs::rename(tmp_path, origin_mapping_file)?;
+        Ok(())
+    }
+
     /// Removes origin information for a worktree (keyed by feature name)
     ///
     /// # Errors
@@ -525,6 +594,46 @@ mod tests {
             storage.get_worktree_origin("myrepo", "payments")?,
             Some("/repo2".to_string())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_worktree_origins_includes_malformed_lines() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
+        let repo_dir = storage.root_dir.join("myrepo");
+        std::fs::create_dir_all(&repo_dir)?;
+        std::fs::write(
+            repo_dir.join(".worktree-origins"),
+            "auth -> /repo\nmalformed\npayments -> /other\n",
+        )?;
+
+        let entries = storage.list_worktree_origins("myrepo")?;
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].feature_name.as_deref(), Some("auth"));
+        assert_eq!(entries[1].feature_name, None);
+        assert_eq!(entries[1].raw_line, "malformed");
+        assert_eq!(entries[2].origin_path.as_deref(), Some("/other"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_rewrite_worktree_origins_removes_malformed_and_duplicates() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
+
+        storage.rewrite_worktree_origins(
+            "myrepo",
+            &[
+                ("auth".to_string(), "/repo".to_string()),
+                ("payments".to_string(), "/other".to_string()),
+            ],
+        )?;
+        storage.rewrite_worktree_origins("myrepo", &[("auth".to_string(), "/new".to_string())])?;
+
+        let content =
+            std::fs::read_to_string(storage.root_dir.join("myrepo").join(".worktree-origins"))?;
+        assert_eq!(content, "auth -> /new\n");
         Ok(())
     }
 

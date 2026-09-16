@@ -2,7 +2,9 @@ use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use worktree::Result;
 use worktree::commands::init::Shell;
 use worktree::commands::skill::SkillAction;
-use worktree::commands::{back, cleanup, create, init, jump, list, remove, skill, status, sync};
+use worktree::commands::{
+    back, cleanup, create, doctor, init, jump, list, remove, skill, status, sync,
+};
 
 #[derive(Parser)]
 #[command(name = "worktree")]
@@ -29,6 +31,9 @@ enum Commands {
         /// Launch interactive selection for --from reference
         #[arg(long, requires = "feature_name", conflicts_with = "from")]
         interactive_from: bool,
+        /// Add a one-off symlink pattern without changing repository config
+        #[arg(long, requires = "feature_name")]
+        link: Vec<String>,
         /// List available git references for completion (internal use)
         #[arg(long, hide = true)]
         list_from_completions: bool,
@@ -39,6 +44,9 @@ enum Commands {
         /// Show worktrees for current repo only
         #[arg(long)]
         current: bool,
+        /// Emit machine-readable JSON
+        #[arg(long)]
+        json: bool,
     },
     /// Remove a worktree
     Remove {
@@ -62,7 +70,11 @@ enum Commands {
         current: bool,
     },
     /// Show worktree status
-    Status,
+    Status {
+        /// Emit machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Sync config files and symlinks between worktrees.
     /// With no arguments, broadcasts from the current repo's origin to all of its worktrees.
     Sync {
@@ -103,6 +115,15 @@ enum Commands {
     },
     /// Clean up orphaned branches and worktree references
     Cleanup,
+    /// Diagnose storage, metadata, and configuration drift
+    Doctor {
+        /// Repair origin metadata only
+        #[arg(long)]
+        fix: bool,
+        /// Restrict diagnostics to the current repository
+        #[arg(long)]
+        current: bool,
+    },
     /// Navigate back to the original repository
     Back,
     /// Manage the worktree-manager agent skill
@@ -121,6 +142,7 @@ fn main() -> Result<()> {
             branch,
             from,
             interactive_from,
+            link,
             list_from_completions,
         } => {
             if list_from_completions {
@@ -135,20 +157,31 @@ fn main() -> Result<()> {
                 }
                 // Feature name provided, wants interactive --from selection
                 (Some(feat), branch_arg, None, true) => {
-                    create::interactive_from_selection(&feat, branch_arg.as_deref())?;
+                    create::interactive_from_selection_with_links(
+                        &feat,
+                        branch_arg.as_deref(),
+                        &link,
+                    )?;
                 }
                 // Feature name and --from provided, no branch — prompt for
                 // the branch and create it from the given reference
                 (Some(feat), None, Some(from_ref), false) => {
-                    create::interactive_create_with_feature_and_from(&feat, &from_ref)?;
+                    create::interactive_create_with_feature_and_from_and_links(
+                        &feat, &from_ref, &link,
+                    )?;
                 }
                 // Feature name provided, no branch — prompt for branch interactively
                 (Some(feat), None, None, false) => {
-                    create::interactive_create_with_feature(&feat)?;
+                    create::interactive_create_with_feature_and_links(&feat, &link)?;
                 }
                 // Both feature name and branch provided
                 (Some(feat), Some(branch_arg), from_ref, false) => {
-                    create::create_worktree(&feat, Some(&branch_arg), from_ref.as_deref())?;
+                    create::create_worktree_with_links(
+                        &feat,
+                        Some(&branch_arg),
+                        from_ref.as_deref(),
+                        &link,
+                    )?;
                 }
                 // Catch-all: invalid combinations
                 _ => {
@@ -158,8 +191,8 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::List { current } => {
-            list::list_worktrees(current)?;
+        Commands::List { current, json } => {
+            list::list_worktrees(current, json)?;
         }
         Commands::Remove {
             target,
@@ -178,8 +211,8 @@ fn main() -> Result<()> {
                 current,
             )?;
         }
-        Commands::Status => {
-            status::show_status()?;
+        Commands::Status { json } => {
+            status::show_status(json)?;
         }
         Commands::Sync { from, to } => {
             sync::sync(from.as_deref(), to.as_deref())?;
@@ -201,6 +234,9 @@ fn main() -> Result<()> {
         }
         Commands::Cleanup => {
             cleanup::cleanup_worktrees()?;
+        }
+        Commands::Doctor { fix, current } => {
+            doctor::doctor_worktrees(fix, current)?;
         }
         Commands::Back => {
             back::back_to_origin()?;

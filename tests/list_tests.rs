@@ -121,3 +121,20 @@ fn test_list_current_outside_git_repository_fails() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_list_json_contains_worktree_records() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.run_command(&["create", "json-list", "feature/json-list"])?
+        .assert()
+        .success();
+
+    let output = get_stdout(&env, &["list", "--json"])?;
+    let json: serde_json::Value = serde_json::from_str(&output)?;
+    assert_eq!(json["current_repo_only"], false);
+    assert_eq!(json["worktrees"][0]["feature"], "json-list");
+    assert_eq!(json["worktrees"][0]["exists"], true);
+    assert!(json["worktrees"][0]["path"].as_str().is_some());
+
+    Ok(())
+}
