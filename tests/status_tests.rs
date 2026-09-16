@@ -3,6 +3,7 @@
 //! These tests validate the status command CLI behavior using real command execution.
 
 use anyhow::Result;
+use assert_fs::prelude::*;
 use std::process::Command;
 
 use test_support::CliTestEnvironment;
@@ -141,5 +142,52 @@ fn test_status_json_contains_registration_and_drift_fields() -> Result<()> {
     assert_eq!(json["managed_worktrees"][0]["registered"], true);
     assert!(json["managed_worktrees"][0]["drift"].is_array());
 
+    Ok(())
+}
+
+#[test]
+fn test_status_doctor_and_sync_drift_roundtrip() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir.child(".worktree-config.toml").write_str(
+        "[copy-patterns]\ninclude = [\".env\"]\nexclude = []\n\
+         [symlink-patterns]\ninclude = [\"shared-agent.md\"]\n",
+    )?;
+    env.repo_dir.child(".env").write_str("TOKEN=local")?;
+    env.repo_dir.child("shared-agent.md").write_str("shared")?;
+
+    env.run_command(&["create", "drift-roundtrip", "feature/drift-roundtrip"])?
+        .assert()
+        .success();
+
+    let worktree = env.worktree_path("drift-roundtrip");
+    std::fs::remove_file(worktree.child(".env").path())?;
+    std::fs::remove_file(worktree.child("shared-agent.md").path())?;
+
+    let status_json: serde_json::Value =
+        serde_json::from_str(&get_stdout(&env, &["status", "--json"])?)?;
+    let drift = status_json["managed_worktrees"][0]["drift"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("status drift was not an array"))?;
+    assert_eq!(drift.len(), 2);
+
+    let status_text = get_stdout(&env, &["status"])?;
+    assert!(status_text.contains("Run `worktree sync`"));
+    let doctor = get_stdout(&env, &["doctor"])?;
+    assert!(doctor.contains("config drift detected"));
+
+    env.run_command(&["sync"])?.assert().success();
+    let repaired: serde_json::Value =
+        serde_json::from_str(&get_stdout(&env, &["status", "--json"])?)?;
+    assert!(
+        repaired["managed_worktrees"][0]["drift"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+    assert!(worktree.child(".env").path().exists());
+    assert!(
+        std::fs::symlink_metadata(worktree.child("shared-agent.md").path())?
+            .file_type()
+            .is_symlink()
+    );
     Ok(())
 }

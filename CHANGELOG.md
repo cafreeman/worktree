@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Safer removal and diagnostics:** `remove` protects tracked/user files
   unless `--force` is supplied, and `status` reports real Git worktree paths.
 
+### Fixed
+
+- Exclude and symlink patterns now apply recursively inside copied directories.
+- Status drift output no longer duplicates a path when overlapping include
+  patterns match the same file.
+
 ## [0.6.0] - 2026-07-24
 
 ### Added

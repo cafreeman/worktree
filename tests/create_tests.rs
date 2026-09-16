@@ -134,6 +134,9 @@ fn test_create_link_adds_one_off_symlink() -> Result<()> {
     env.repo_dir
         .child("agent-state.md")
         .write_str("agent state")?;
+    env.repo_dir
+        .child("agent-cache.json")
+        .write_str("agent cache")?;
 
     env.run_command(&[
         "create",
@@ -141,6 +144,8 @@ fn test_create_link_adds_one_off_symlink() -> Result<()> {
         "feature/linked-state",
         "--link",
         "agent-state.md",
+        "--link",
+        "agent-cache.json",
     ])?
     .assert()
     .success();
@@ -155,7 +160,98 @@ fn test_create_link_adds_one_off_symlink() -> Result<()> {
         std::fs::read_link(link)?,
         env.repo_dir.path().join("agent-state.md").canonicalize()?
     );
+    assert!(
+        std::fs::symlink_metadata(
+            env.worktree_path("linked-state")
+                .path()
+                .join("agent-cache.json")
+        )?
+        .file_type()
+        .is_symlink()
+    );
 
+    Ok(())
+}
+
+#[test]
+fn test_create_link_preserves_tracked_checkout() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child("tracked-agent.md")
+        .write_str("tracked")?;
+    for args in [
+        &["add", "tracked-agent.md"][..],
+        &["commit", "-m", "Add tracked agent file"][..],
+    ] {
+        let status = std::process::Command::new("git")
+            .args(args)
+            .current_dir(env.repo_dir.path())
+            .status()?;
+        assert!(status.success());
+    }
+
+    env.run_command(&[
+        "create",
+        "tracked-link",
+        "feature/tracked-link",
+        "--link",
+        "tracked-agent.md",
+    ])?
+    .assert()
+    .success();
+
+    let path = env
+        .worktree_path("tracked-link")
+        .path()
+        .join("tracked-agent.md");
+    assert!(!std::fs::symlink_metadata(&path)?.file_type().is_symlink());
+    assert_eq!(std::fs::read_to_string(path)?, "tracked");
+    Ok(())
+}
+
+#[test]
+fn test_on_create_hooks_run_in_worktree() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child(".worktree-config.toml")
+        .write_str("[on-create]\ncommands = [\"pwd > .hook-cwd\", \"touch .hook-ran\"]\n")?;
+
+    env.run_command(&["create", "hook-success", "feature/hook-success"])?
+        .assert()
+        .success();
+
+    let worktree = env.worktree_path("hook-success");
+    worktree
+        .child(".hook-ran")
+        .assert(predicate::path::exists());
+    let hook_cwd = std::fs::read_to_string(worktree.child(".hook-cwd").path())?;
+    assert_eq!(
+        std::path::Path::new(hook_cwd.trim()).canonicalize()?,
+        worktree.path().canonicalize()?
+    );
+    Ok(())
+}
+
+#[test]
+fn test_failing_on_create_hook_stops_but_keeps_worktree() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir.child(".worktree-config.toml").write_str(
+        "[on-create]\ncommands = [\"touch .before-failure\", \"false\", \"touch .after-failure\"]\n",
+    )?;
+
+    env.run_command(&["create", "hook-failure", "feature/hook-failure"])?
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Hook command failed"));
+
+    let worktree = env.worktree_path("hook-failure");
+    worktree.assert(predicate::path::is_dir());
+    worktree
+        .child(".before-failure")
+        .assert(predicate::path::exists());
+    worktree
+        .child(".after-failure")
+        .assert(predicate::path::missing());
     Ok(())
 }
 

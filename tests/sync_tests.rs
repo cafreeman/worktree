@@ -539,3 +539,57 @@ fn test_sync_broadcast_from_inside_worktree_uses_origin() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_tracked_directory_symlink_lifecycle() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child("shared-agent/state.md")
+        .write_str("shared state")?;
+    create_worktree_config_with_symlinks(&env.repo_dir, &[], &["shared-agent/"])?;
+
+    for args in [
+        &["add", "shared-agent"][..],
+        &["commit", "-m", "Add tracked shared state"][..],
+    ] {
+        let status = std::process::Command::new("git")
+            .args(args)
+            .current_dir(env.repo_dir.path())
+            .status()?;
+        assert!(status.success());
+    }
+
+    env.run_command(&["create", "tracked-shared", "feature/tracked-shared"])?
+        .assert()
+        .success();
+    let shared = env.worktree_path("tracked-shared").child("shared-agent");
+    assert!(
+        !std::fs::symlink_metadata(shared.path())?
+            .file_type()
+            .is_symlink(),
+        "create must preserve the tracked checkout"
+    );
+
+    env.run_command(&["status"])?
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copy exists, should be symlink"));
+
+    env.run_command(&["sync"])?.assert().success();
+    assert!(
+        std::fs::symlink_metadata(shared.path())?
+            .file_type()
+            .is_symlink(),
+        "sync should force-relink the drifted tracked directory"
+    );
+    assert_eq!(
+        std::fs::read_link(shared.path())?,
+        env.repo_dir.path().join("shared-agent").canonicalize()?
+    );
+
+    env.run_command(&["status"])?
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("copy exists, should be symlink").not());
+    Ok(())
+}

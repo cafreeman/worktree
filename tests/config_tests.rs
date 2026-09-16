@@ -66,6 +66,64 @@ fn test_agent_oriented_defaults_present() -> Result<()> {
 }
 
 #[test]
+fn test_default_agent_state_is_copied_from_real_ignored_repo() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.repo_dir
+        .child(".gitignore")
+        .write_str(".env\n.mcp.json\n.claude/\n.cursor/\n.codex/\nconfig/local/\n")?;
+    std::process::Command::new("git")
+        .args(["add", ".gitignore"])
+        .current_dir(env.repo_dir.path())
+        .status()?;
+    std::process::Command::new("git")
+        .args(["commit", "-m", "Add ignore rules"])
+        .current_dir(env.repo_dir.path())
+        .status()?;
+
+    env.repo_dir.child(".env").write_str("TOKEN=local")?;
+    env.repo_dir.child(".mcp.json").write_str("{}")?;
+    env.repo_dir
+        .child(".claude/settings.local.json")
+        .write_str("{}")?;
+    env.repo_dir.child(".cursor/agent.json").write_str("{}")?;
+    env.repo_dir
+        .child(".codex/config.toml")
+        .write_str("local=true")?;
+    env.repo_dir
+        .child("config/local/agent.conf")
+        .write_str("enabled")?;
+
+    env.run_command(&["create", "agent-defaults", "feature/agent-defaults"])?
+        .assert()
+        .success();
+
+    let worktree = env.worktree_path("agent-defaults");
+    for path in [
+        ".env",
+        ".mcp.json",
+        ".claude/settings.local.json",
+        ".cursor/agent.json",
+        ".codex/config.toml",
+        "config/local/agent.conf",
+    ] {
+        worktree.child(path).assert(predicate::path::exists());
+    }
+
+    let status = std::process::Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(worktree.path())
+        .output()?;
+    assert!(
+        status.stdout.is_empty(),
+        "ignored copied state should not dirty the worktree: {}",
+        String::from_utf8_lossy(&status.stdout)
+    );
+
+    Ok(())
+}
+
+#[test]
 fn test_empty_include_list_replaces_defaults() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
@@ -83,6 +141,51 @@ fn test_empty_include_list_replaces_defaults() -> Result<()> {
         "explicitly empty include list must replace defaults, got {includes:?}"
     );
 
+    Ok(())
+}
+
+#[test]
+fn test_empty_include_list_copies_nothing_on_create() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child(".worktree-config.toml")
+        .write_str("[copy-patterns]\ninclude = []\nexclude = []\n")?;
+    env.repo_dir.child(".env").write_str("SHOULD_NOT_COPY=1")?;
+
+    env.run_command(&["create", "no-copy", "feature/no-copy"])?
+        .assert()
+        .success();
+
+    env.worktree_path("no-copy")
+        .child(".env")
+        .assert(predicate::path::missing());
+    Ok(())
+}
+
+#[test]
+fn test_excludes_apply_inside_copied_directories() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+    env.repo_dir
+        .child(".worktree-config.toml")
+        .write_str("[copy-patterns]\ninclude = [\"agent-cache/\"]\nexclude = [\"*.log\"]\n")?;
+    env.repo_dir
+        .child("agent-cache/keep.json")
+        .write_str("{}")?;
+    env.repo_dir
+        .child("agent-cache/debug.log")
+        .write_str("noise")?;
+
+    env.run_command(&["create", "nested-exclude", "feature/nested-exclude"])?
+        .assert()
+        .success();
+
+    let worktree = env.worktree_path("nested-exclude");
+    worktree
+        .child("agent-cache/keep.json")
+        .assert(predicate::path::exists());
+    worktree
+        .child("agent-cache/debug.log")
+        .assert(predicate::path::missing());
     Ok(())
 }
 

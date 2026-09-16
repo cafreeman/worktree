@@ -291,7 +291,13 @@ pub fn copy_config_files_with_symlinks(
                         .with_context(|| format!("Failed to copy {}", relative_path.display()))?;
                     println!("  Copied: {}", relative_path.display());
                 } else if source_file.is_dir() {
-                    copy_dir_recursive(&source_file, &target_file)?;
+                    copy_dir_recursive(
+                        &source_file,
+                        &target_file,
+                        source_path,
+                        config.copy_patterns.exclude.as_deref().unwrap_or_default(),
+                        &symlink_patterns,
+                    )?;
                     println!("  Copied directory: {}", relative_path.display());
                 }
             }
@@ -459,7 +465,13 @@ fn plain_pattern_matches(rel: &str, pattern: &str) -> bool {
     rel.split('/').any(|segment| segment == normalized)
 }
 
-fn copy_dir_recursive(source: &Path, target: &Path) -> Result<()> {
+fn copy_dir_recursive(
+    source: &Path,
+    target: &Path,
+    source_root: &Path,
+    exclude_patterns: &[String],
+    symlink_patterns: &[String],
+) -> Result<()> {
     std::fs::create_dir_all(target)?;
 
     for entry in std::fs::read_dir(source)? {
@@ -467,8 +479,23 @@ fn copy_dir_recursive(source: &Path, target: &Path) -> Result<()> {
         let source_path = entry.path();
         let target_path = target.join(entry.file_name());
 
+        if should_exclude_file(&source_path, source_root, exclude_patterns)?
+            || is_covered_by_symlink_pattern(&source_path, source_root, symlink_patterns)
+            || target_path
+                .symlink_metadata()
+                .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            continue;
+        }
+
         if source_path.is_dir() {
-            copy_dir_recursive(&source_path, &target_path)?;
+            copy_dir_recursive(
+                &source_path,
+                &target_path,
+                source_root,
+                exclude_patterns,
+                symlink_patterns,
+            )?;
         } else {
             std::fs::copy(&source_path, &target_path)?;
         }

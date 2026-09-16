@@ -14,10 +14,24 @@ pub(crate) struct DriftEntry {
     pub(crate) kind: DriftKind,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DriftKind {
     MissingSymlink,
     CopyInsteadOfSymlink,
     MissingCopy,
+}
+
+fn push_drift(drift: &mut Vec<DriftEntry>, relative_path: &Path, kind: DriftKind) {
+    let relative_path = relative_path.display().to_string();
+    if !drift
+        .iter()
+        .any(|entry| entry.relative_path == relative_path && entry.kind == kind)
+    {
+        drift.push(DriftEntry {
+            relative_path,
+            kind,
+        });
+    }
 }
 
 impl DriftKind {
@@ -198,16 +212,10 @@ pub(crate) fn detect_config_drift(
                     // Correctly symlinked — not drift.
                 }
                 Ok(_) => {
-                    drift.push(DriftEntry {
-                        relative_path: relative_path.display().to_string(),
-                        kind: DriftKind::CopyInsteadOfSymlink,
-                    });
+                    push_drift(&mut drift, relative_path, DriftKind::CopyInsteadOfSymlink);
                 }
                 Err(_) => {
-                    drift.push(DriftEntry {
-                        relative_path: relative_path.display().to_string(),
-                        kind: DriftKind::MissingSymlink,
-                    });
+                    push_drift(&mut drift, relative_path, DriftKind::MissingSymlink);
                 }
             }
         }
@@ -234,10 +242,7 @@ pub(crate) fn detect_config_drift(
             let target = worktree_path.join(relative_path);
 
             if target.symlink_metadata().is_err() {
-                drift.push(DriftEntry {
-                    relative_path: relative_path.display().to_string(),
-                    kind: DriftKind::MissingCopy,
-                });
+                push_drift(&mut drift, relative_path, DriftKind::MissingCopy);
             }
         }
     }
