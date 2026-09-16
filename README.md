@@ -104,6 +104,8 @@ worktree remove agent-task --force
 `--link` is repeatable and applies only to that creation. `--force` bypasses
 the safety check for tracked changes or unknown user files, so review the
 worktree before using it.
+Use `--link` for local or ignored state: creation does not replace a path Git
+has already checked out as a tracked file.
 
 ## Interactive Features
 

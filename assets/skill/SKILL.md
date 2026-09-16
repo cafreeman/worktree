@@ -80,6 +80,9 @@ Flags:
 After creation, files matching `.worktree-config.toml` patterns are copied/symlinked and
 `on-create` hooks are run automatically.
 
+Use `--link` for local or ignored agent state. Creation never replaces a path
+already checked out by Git as a tracked file.
+
 ### `worktree list [--current]`
 
 List all worktrees. Shows feature name, branch, and status.
