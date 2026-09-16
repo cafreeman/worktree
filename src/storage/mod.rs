@@ -13,8 +13,8 @@ impl WorktreeStorage {
     /// - Failed to determine home directory
     /// - Failed to create storage directory
     pub fn new() -> Result<Self> {
-        let root_dir = if let Ok(custom_root) = std::env::var("WORKTREE_STORAGE_ROOT") {
-            PathBuf::from(custom_root)
+        let root_dir = if let Some(custom_root) = Self::custom_root_from_env() {
+            custom_root
         } else {
             dirs::home_dir()
                 .context("Failed to get user home directory")?
@@ -24,6 +24,16 @@ impl WorktreeStorage {
         std::fs::create_dir_all(&root_dir).context("Failed to create worktrees directory")?;
 
         Ok(Self { root_dir })
+    }
+
+    /// Returns `WORKTREE_STORAGE_ROOT` when set to a non-empty value.
+    /// A set-but-empty value is treated as unset so it doesn't break every
+    /// storage operation with empty-path errors.
+    fn custom_root_from_env() -> Option<PathBuf> {
+        match std::env::var("WORKTREE_STORAGE_ROOT") {
+            Ok(custom_root) if !custom_root.trim().is_empty() => Some(PathBuf::from(custom_root)),
+            _ => None,
+        }
     }
 
     /// Extracts repository name from a path
@@ -204,24 +214,49 @@ impl WorktreeStorage {
         std::fs::create_dir_all(&repo_dir)?;
 
         let origin_mapping_file = repo_dir.join(".worktree-origins");
-        let mapping_entry = format!("{} -> {}\n", feature_name, origin_path);
+        let mapping_line = format!("{} -> {}", feature_name, origin_path);
 
         // Read existing mappings
-        let mut existing_content = if origin_mapping_file.exists() {
+        let existing_content = if origin_mapping_file.exists() {
             std::fs::read_to_string(&origin_mapping_file)?
         } else {
             String::new()
         };
 
-        // Check if mapping already exists (exact line match)
-        let search_line = format!("{} -> {}", feature_name, origin_path);
-        if !existing_content.lines().any(|line| line == search_line) {
-            existing_content.push_str(&mapping_entry);
-            // Write atomically: write to temp then rename
-            let tmp_path = origin_mapping_file.with_extension("tmp");
-            std::fs::write(&tmp_path, &existing_content)?;
-            std::fs::rename(&tmp_path, &origin_mapping_file)?;
+        // Fast path: this exact mapping is already the only entry for this
+        // feature name — nothing to do.
+        let entries_for_feature: Vec<&str> = existing_content
+            .lines()
+            .filter(|line| {
+                line.split_once(" -> ")
+                    .is_some_and(|(key, _)| key == feature_name)
+            })
+            .collect();
+        if entries_for_feature.len() == 1 && entries_for_feature[0] == mapping_line {
+            return Ok(());
         }
+
+        // Replace-on-write: drop any previous entry for this feature name,
+        // then append the new mapping. get_worktree_origin returns the FIRST
+        // match, so a stale entry (e.g. after the origin repo moved) would
+        // otherwise shadow the new origin forever.
+        let mut kept: Vec<String> = existing_content
+            .lines()
+            .filter(|line| {
+                line.split_once(" -> ")
+                    .is_none_or(|(key, _)| key != feature_name)
+            })
+            .map(str::to_string)
+            .collect();
+        kept.push(mapping_line);
+
+        let mut new_content = kept.join("\n");
+        new_content.push('\n');
+
+        // Write atomically: write to temp then rename
+        let tmp_path = origin_mapping_file.with_extension("tmp");
+        std::fs::write(&tmp_path, &new_content)?;
+        std::fs::rename(&tmp_path, &origin_mapping_file)?;
 
         Ok(())
     }
@@ -436,6 +471,42 @@ mod tests {
         let result = storage.get_worktree_origin("myrepo", "auth")?;
         assert_eq!(result, Some("/home/user/repo".to_string()));
         Ok(())
+    }
+
+    #[test]
+    fn test_store_worktree_origin_replaces_stale_entry() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
+
+        // Same feature name re-created with a different origin (e.g. the
+        // origin repo moved): the new mapping must replace the old one.
+        storage.store_worktree_origin("myrepo", "auth", "/old/repo")?;
+        storage.store_worktree_origin("myrepo", "auth", "/new/repo")?;
+
+        assert_eq!(
+            storage.get_worktree_origin("myrepo", "auth")?,
+            Some("/new/repo".to_string()),
+            "re-created worktree must resolve to the NEW origin"
+        );
+
+        let origin_file = storage.root_dir.join("myrepo").join(".worktree-origins");
+        let content = std::fs::read_to_string(&origin_file)?;
+        assert_eq!(content, "auth -> /new/repo\n");
+        Ok(())
+    }
+
+    #[test]
+    fn test_custom_root_from_env_ignores_empty_value() {
+        // A set-but-empty WORKTREE_STORAGE_ROOT must behave as unset
+        temp_env::with_var("WORKTREE_STORAGE_ROOT", Some(""), || {
+            assert!(WorktreeStorage::custom_root_from_env().is_none());
+        });
+        temp_env::with_var("WORKTREE_STORAGE_ROOT", Some("/custom/root"), || {
+            assert_eq!(
+                WorktreeStorage::custom_root_from_env(),
+                Some(PathBuf::from("/custom/root"))
+            );
+        });
     }
 
     #[test]

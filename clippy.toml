@@ -2,8 +2,8 @@
 # This supplements the lint levels defined in Cargo.toml
 
 # Minimum Supported Rust Version (MSRV)
-# Adjust this based on your project's requirements
-msrv = "1.70.0"
+# Edition 2024 requires Rust 1.85 or newer
+msrv = "1.85.0"
 
 # Avoid breaking exported API
 avoid-breaking-exported-api = false
