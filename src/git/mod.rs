@@ -164,6 +164,7 @@ impl GitRepo {
         Ok(worktree_names
             .into_iter()
             .flatten()
+            .flatten()
             .map(std::string::ToString::to_string)
             .collect())
     }
@@ -179,7 +180,7 @@ impl GitRepo {
         let worktree_names = self.repo.worktrees()?;
         let mut result = Vec::new();
 
-        for name in worktree_names.iter().flatten() {
+        for name in worktree_names.iter().flatten().flatten() {
             if let Ok(wt) = self.repo.find_worktree(name) {
                 let path = wt.path().to_path_buf();
                 let is_prunable = wt.is_prunable(None).unwrap_or(false);
@@ -246,7 +247,7 @@ impl GitRepo {
         let tags = self.repo.tag_names(None)?;
         let mut tag_names = Vec::new();
 
-        for tag in tags.iter().flatten() {
+        for tag in tags.iter().flatten().flatten() {
             tag_names.push(tag.to_string());
         }
 

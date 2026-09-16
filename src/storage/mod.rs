@@ -340,7 +340,7 @@ pub fn read_worktree_head_branch(path: &Path) -> Option<String> {
     let repo = git2::Repository::open(path).ok()?;
     let head = repo.head().ok()?;
     if head.is_branch() {
-        head.shorthand().map(ToString::to_string)
+        head.shorthand().ok().map(ToString::to_string)
     } else {
         None
     }

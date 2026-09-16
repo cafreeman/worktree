@@ -198,7 +198,7 @@ fn check_worktree_dirty(
     let mut untracked_files = Vec::new();
 
     for entry in statuses.iter() {
-        let Some(path) = entry.path() else {
+        let Ok(path) = entry.path() else {
             continue;
         };
         let path = path.to_string();
