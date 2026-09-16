@@ -38,15 +38,26 @@ impl WorktreeStorage {
         }
     }
 
-    /// Validates a feature name, rejecting characters that are invalid for directory names.
+    /// Validates a feature name, rejecting characters and forms that are invalid
+    /// or unsafe for directory names.
     ///
     /// Feature names must not contain: `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`
+    /// and must not be `.`, `..`, or start with `.` (hidden directories are not
+    /// visible to the storage listing, and dot segments can escape the storage root).
     ///
     /// # Errors
-    /// Returns an error if the name contains invalid characters or is empty.
+    /// Returns an error if the name contains invalid characters, is empty,
+    /// or resolves outside the storage directory.
     pub fn validate_feature_name(name: &str) -> Result<()> {
         if name.trim().is_empty() {
             anyhow::bail!("Feature name cannot be empty");
+        }
+
+        if name == "." || name == ".." || name.starts_with('.') {
+            anyhow::bail!(
+                "Feature name '{}' is invalid. Feature names cannot be '.', '..', or start with '.'",
+                name
+            );
         }
 
         let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
@@ -68,6 +79,46 @@ impl WorktreeStorage {
     #[must_use]
     pub fn get_worktree_path(&self, repo_name: &str, feature_name: &str) -> PathBuf {
         self.root_dir.join(repo_name).join(feature_name)
+    }
+
+    /// Resolves the storage path for a user-supplied feature name, after
+    /// validating the name and asserting the result stays inside this
+    /// repository's storage directory.
+    ///
+    /// This is the safe alternative to [`Self::get_worktree_path`] for
+    /// user-supplied names: it rejects path traversal (`..`, `../..`,
+    /// absolute paths) before any filesystem operation uses the result.
+    ///
+    /// # Errors
+    /// Returns an error if the feature name is invalid or the resolved path
+    /// escapes the repository's storage directory.
+    pub fn resolve_managed_path(&self, repo_name: &str, feature_name: &str) -> Result<PathBuf> {
+        Self::validate_feature_name(feature_name)?;
+
+        let worktree_path = self.get_worktree_path(repo_name, feature_name);
+        let repo_dir = self.get_repo_storage_dir(repo_name);
+
+        // Containment check: compare canonical-to-canonical when both sides
+        // exist (catches symlinks inside the storage dir that point outside),
+        // and raw-to-raw otherwise. Mixing forms would break on platforms
+        // with symlinked temp paths (e.g. /var -> /private/var on macOS).
+        let canonical_worktree = worktree_path.canonicalize().ok();
+        let canonical_repo_dir = repo_dir.canonicalize().ok();
+
+        let contained = match (&canonical_worktree, &canonical_repo_dir) {
+            (Some(worktree), Some(repo)) => worktree.starts_with(repo),
+            _ => worktree_path.starts_with(&repo_dir),
+        };
+
+        if !contained {
+            anyhow::bail!(
+                "Invalid worktree name '{}': resolved path '{}' escapes the storage directory",
+                feature_name,
+                worktree_path.display()
+            );
+        }
+
+        Ok(worktree_path)
     }
 
     /// Lists all worktrees for a specific repository
@@ -307,6 +358,41 @@ mod tests {
     fn test_validate_feature_name_empty_rejected() {
         assert!(WorktreeStorage::validate_feature_name("").is_err());
         assert!(WorktreeStorage::validate_feature_name("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_feature_name_dot_segments_rejected() {
+        assert!(WorktreeStorage::validate_feature_name(".").is_err());
+        assert!(WorktreeStorage::validate_feature_name("..").is_err());
+        assert!(WorktreeStorage::validate_feature_name(".env").is_err());
+        assert!(WorktreeStorage::validate_feature_name("...").is_err());
+        // Dots inside a name remain valid
+        assert!(WorktreeStorage::validate_feature_name("auth-v2.0").is_ok());
+    }
+
+    #[test]
+    fn test_resolve_managed_path_rejects_traversal() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
+
+        for target in ["..", "../..", "a/b", "/etc", "C:\\x"] {
+            assert!(
+                storage.resolve_managed_path("myrepo", target).is_err(),
+                "target '{}' should be rejected",
+                target
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_managed_path_returns_expected_path() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let storage = make_storage(&tmp)?;
+
+        let path = storage.resolve_managed_path("myrepo", "auth")?;
+        assert!(path.ends_with("myrepo/auth"));
+        Ok(())
     }
 
     // ── get_worktree_path ────────────────────────────────────────────────────

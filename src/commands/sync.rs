@@ -158,6 +158,8 @@ fn resolve_worktree_path(
         return Ok((target_path.to_path_buf(), branch_name));
     }
 
-    let worktree_path = storage.get_worktree_path(repo_name, target);
+    // Feature name: validate (rejects traversal/absolute paths) and
+    // containment-check before resolving the storage path.
+    let worktree_path = storage.resolve_managed_path(repo_name, target)?;
     Ok((worktree_path, target.to_string()))
 }

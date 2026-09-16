@@ -122,8 +122,10 @@ fn resolve_target(
     storage: &WorktreeStorage,
     repo_name: &str,
 ) -> Result<(PathBuf, String)> {
-    // Match by feature name (directory name) directly
-    let worktree_path = storage.get_worktree_path(repo_name, target);
+    // Match by feature name (directory name) directly.
+    // resolve_managed_path validates the name (rejecting traversal like `..`
+    // or absolute paths) and asserts the path stays inside the storage dir.
+    let worktree_path = storage.resolve_managed_path(repo_name, target)?;
     if worktree_path.exists() {
         return Ok((worktree_path, target.to_string()));
     }
@@ -136,7 +138,7 @@ fn resolve_target(
         0 => anyhow::bail!("No worktree found matching '{}'", target),
         1 => {
             let feature_name = matches[0].clone();
-            let path = storage.get_worktree_path(repo_name, &feature_name);
+            let path = storage.resolve_managed_path(repo_name, &feature_name)?;
             Ok((path, feature_name))
         }
         _ => {
