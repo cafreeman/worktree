@@ -6,6 +6,29 @@ use predicates::prelude::*;
 
 use test_support::CliTestEnvironment;
 
+/// Cleanup on a healthy repo must not report managed worktrees as unregistered.
+/// git canonicalizes worktree paths (/private/var on macOS) while storage paths
+/// are raw; naive comparison produced false "may not be registered" warnings.
+#[test]
+fn test_cleanup_healthy_repo_reports_no_false_positives() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "healthy-a", "feature/healthy-a"])?
+        .assert()
+        .success();
+    env.run_command(&["create", "healthy-b", "feature/healthy-b"])?
+        .assert()
+        .success();
+
+    let output = env.run_command(&["cleanup"])?.assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+    assert!(
+        !stdout.contains("may not be registered"),
+        "healthy worktrees must not be flagged: {stdout}"
+    );
+    Ok(())
+}
+
 /// When a managed worktree dir is removed manually, cleanup removes orphaned git references
 #[test]
 fn test_cleanup_removes_orphaned_git_references() -> Result<()> {

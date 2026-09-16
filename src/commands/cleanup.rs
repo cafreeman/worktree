@@ -1,7 +1,16 @@
 use anyhow::Result;
+use std::path::PathBuf;
 
 use crate::git::GitRepo;
 use crate::storage::WorktreeStorage;
+
+/// Canonicalizes a path so comparisons survive symlinked locations
+/// (git canonicalizes worktree paths, e.g. /var -> /private/var on macOS,
+/// while storage paths are built raw). Falls back to the raw path when it
+/// doesn't exist on disk.
+fn canonical_or_raw(path: PathBuf) -> PathBuf {
+    path.canonicalize().unwrap_or(path)
+}
 
 /// Cleans up orphaned worktree references and directories
 ///
@@ -18,19 +27,23 @@ pub fn cleanup_worktrees() -> Result<()> {
     println!("🔍 Analyzing worktree state...");
 
     let mut cleaned = Vec::new();
+    let canonical_current = canonical_or_raw(current_dir);
 
     // Clean up any git worktree references that point to non-existent directories
     match git_repo.list_worktrees_with_paths() {
         Ok(worktrees) => {
             for (name, path, is_prunable) in worktrees {
-                if path == current_dir {
+                let canonical_path = canonical_or_raw(path);
+
+                // Never prune the worktree the caller is standing in
+                if canonical_current.starts_with(&canonical_path) {
                     continue;
                 }
 
-                if is_prunable || !path.exists() {
+                if is_prunable || !canonical_path.exists() {
                     println!(
                         "🗑️  Found orphaned git worktree reference: {}",
-                        path.display()
+                        canonical_path.display()
                     );
                     match git_repo.remove_worktree(&name) {
                         Ok(_) => {
@@ -50,19 +63,19 @@ pub fn cleanup_worktrees() -> Result<()> {
         }
     }
 
-    // Prune worktree directories for feature worktrees whose git reference no longer exists
+    // Report worktree directories for feature worktrees whose git reference no longer exists
     // (i.e., the dir exists but git doesn't know about that worktree anymore)
     if let Ok(repo_worktrees) = storage.list_repo_worktrees(&repo_name) {
         let git_worktree_paths: Vec<_> = git_repo
             .list_worktrees_with_paths()
             .unwrap_or_default()
             .into_iter()
-            .map(|(_, path, _)| path)
+            .map(|(_, path, _)| canonical_or_raw(path))
             .collect();
 
         for feature_name in repo_worktrees {
             let path = storage.get_worktree_path(&repo_name, &feature_name);
-            if path.exists() && !git_worktree_paths.contains(&path) {
+            if path.exists() && !git_worktree_paths.contains(&canonical_or_raw(path.clone())) {
                 // Check if git even knows about this path
                 // It may be a newly created worktree or an orphan
                 // Only remove if we're confident it's orphaned (git prune would handle it)
