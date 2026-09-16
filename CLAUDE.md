@@ -95,9 +95,10 @@ The project uses `cargo-release` for automated version management and release pr
 **IMPORTANT:** The release configuration is set to NEVER auto-publish. All releases must be done manually by the maintainer.
 
 ### Release Workflow
-1. **Version Bumping**: Use `cargo release <level>` where level is `patch`, `minor`, or `major`
-2. **Manual Publishing**: After version bump, manually run `cargo publish` if desired
-3. **Changelog**: Update `CHANGELOG.md` following Keep a Changelog format
+1. **Changelog**: Update `CHANGELOG.md` following Keep a Changelog format
+2. **Preview**: Run `cargo release <level>` (dry-run is the default)
+3. **Execute**: The maintainer runs `cargo release <level> --execute`
+4. **Manual Publishing**: After the release commit/tag, run `cargo publish` separately
 
 ### Safety Features
 - Manual initiation only - releases must be explicitly triggered by maintainer
@@ -108,8 +109,11 @@ The project uses `cargo-release` for automated version management and release pr
 ### Release Process
 When ready to publish a new version:
 ```bash
-# Update CHANGELOG.md first, then run:
-cargo release patch  # or minor/major
+# Preview only:
+cargo release minor
+
+# Maintainer-approved execution (creates and pushes commit/tag):
+cargo release minor --execute
 
 # This updates the version, creates the release commit and tag, and pushes
 # according to release.toml. It does not publish to crates.io.

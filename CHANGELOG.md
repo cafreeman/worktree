@@ -21,18 +21,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Agent-oriented defaults:** Copy defaults now include common MCP and local
   coding-agent state, while excluding `.venv/`, `dist/`, and `build/`.
-- **Explicit configuration opt-out:** Empty `include` and `exclude` arrays now
-  replace built-in defaults instead of merging with them.
+- **BREAKING: Explicit configuration opt-out:** Empty `include` and `exclude`
+  arrays now replace built-in defaults instead of merging with them.
 - **Unix-only support:** Shell integration and the companion skill now declare
   Unix platform support explicitly.
 - **Safer removal and diagnostics:** `remove` protects tracked/user files
   unless `--force` is supplied, and `status` reports real Git worktree paths.
+- **Dependency refresh:** Updated runtime and development dependencies,
+  including git2 0.21, dirs 7, toml 1, and clap 4.6.
+- **Skill preservation:** Installing or updating a changed agent skill now
+  saves the previous contents as `SKILL.md.bak`.
+
+### Removed
+
+- Removed Git config inheritance. Linked worktrees already share repository
+  configuration, and the old implementation copied global settings into the
+  repository's local `.git/config`.
 
 ### Fixed
 
+- Commands run from inside a linked worktree now consistently resolve the main
+  repository for storage, configuration, listing, sync, and back navigation.
+- Origin metadata is replaced atomically when a feature is recreated, and an
+  empty `WORKTREE_STORAGE_ROOT` is treated as unset.
+- Cleanup and status path comparisons now handle canonicalized paths correctly,
+  including macOS `/var` to `/private/var` resolution.
+- `create <feature> --from <ref>` now prompts for the branch and preserves the
+  requested starting reference instead of silently dropping it.
+- Branch validation rejects additional Git-reserved forms.
 - Exclude and symlink patterns now apply recursively inside copied directories.
 - Status drift output no longer duplicates a path when overlapping include
   patterns match the same file.
+
+### Security
+
+- Feature names are validated and managed paths are containment-checked before
+  create, remove, or sync operations, preventing path traversal and deletion
+  outside the configured worktree storage root.
 
 ## [0.6.0] - 2026-07-24
 
