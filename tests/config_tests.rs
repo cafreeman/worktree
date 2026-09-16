@@ -40,6 +40,53 @@ fn test_no_config_file_uses_defaults() -> Result<()> {
 }
 
 #[test]
+fn test_agent_oriented_defaults_present() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
+
+    // The tool's goal is preserving agent state across worktrees, so the
+    // defaults cover agent-local files with zero configuration.
+    let includes = config.copy_patterns.include.as_ref().unwrap();
+    assert!(includes.contains(&".mcp.json".to_string()));
+    assert!(
+        includes.contains(&".claude/settings.local.json".to_string()),
+        "agent-local Claude settings must be copied by default"
+    );
+    assert!(includes.contains(&".cursor/".to_string()));
+    assert!(includes.contains(&".codex/".to_string()));
+
+    // Common artifact directories are excluded by default
+    let excludes = config.copy_patterns.exclude.as_ref().unwrap();
+    assert!(excludes.contains(&".venv/".to_string()));
+    assert!(excludes.contains(&"dist/".to_string()));
+    assert!(excludes.contains(&"build/".to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn test_empty_include_list_replaces_defaults() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.repo_dir
+        .child(".worktree-config.toml")
+        .write_str("[copy-patterns]\ninclude = []\n")?;
+
+    let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
+
+    // An explicitly empty include list opts out of ALL copying (defaults
+    // must not sneak back in).
+    let includes = config.copy_patterns.include.as_ref().unwrap();
+    assert!(
+        includes.is_empty(),
+        "explicitly empty include list must replace defaults, got {includes:?}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn test_complete_config_works_legacy() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
@@ -397,7 +444,8 @@ exclude = [".vscode/"]
 fn test_empty_include_exclude_arrays() -> Result<()> {
     let env = CliTestEnvironment::new()?;
 
-    // Config with empty arrays should still get defaults
+    // Explicitly empty arrays REPLACE the defaults (the opt-out for users
+    // who don't want anything copied or excluded).
     env.repo_dir.child(".worktree-config.toml").write_str(
         r#"
 [copy-patterns]
@@ -408,14 +456,17 @@ exclude = []
 
     let config = WorktreeConfig::load_from_repo(&env.repo_dir)?;
 
-    // Should have defaults (precedence-based merging always adds defaults)
     let includes = config.copy_patterns.include.as_ref().unwrap();
-    assert!(includes.contains(&".env*".to_string()));
-    assert!(includes.contains(&".vscode/".to_string()));
+    assert!(
+        includes.is_empty(),
+        "empty include array must replace defaults, got {includes:?}"
+    );
 
     let excludes = config.copy_patterns.exclude.as_ref().unwrap();
-    assert!(excludes.contains(&"node_modules/".to_string()));
-    assert!(excludes.contains(&"target/".to_string()));
+    assert!(
+        excludes.is_empty(),
+        "empty exclude array must replace defaults, got {excludes:?}"
+    );
 
     Ok(())
 }

@@ -68,13 +68,21 @@ impl Default for WorktreeConfig {
 }
 
 impl WorktreeConfig {
-    /// Default include patterns for file copying
+    /// Default include patterns for file copying.
+    ///
+    /// Beyond common local config files these cover agent-oriented state
+    /// (MCP servers, agent-local settings) so coding agents keep their
+    /// context across worktrees with zero configuration.
     fn default_include_patterns() -> Vec<String> {
         vec![
             ".env*".to_string(),
             ".vscode/".to_string(),
             "*.local.json".to_string(),
             "config/local/*".to_string(),
+            ".mcp.json".to_string(),
+            ".claude/settings.local.json".to_string(),
+            ".cursor/".to_string(),
+            ".codex/".to_string(),
         ]
     }
 
@@ -86,6 +94,9 @@ impl WorktreeConfig {
             ".git/".to_string(),
             "*.log".to_string(),
             "*.tmp".to_string(),
+            ".venv/".to_string(),
+            "dist/".to_string(),
+            "build/".to_string(),
         ]
     }
 
@@ -122,34 +133,45 @@ impl WorktreeConfig {
     }
 
     /// Merges user configuration with defaults.
+    ///
+    /// A non-empty user list is merged additively on top of the defaults;
+    /// an explicitly empty list (`include = []`) REPLACES the defaults so
+    /// the tool's built-in patterns can be turned off entirely.
     #[must_use]
     pub fn merged_with_defaults(self) -> Self {
-        let mut merged_includes = Self::default_include_patterns();
-        let mut merged_excludes = Self::default_exclude_patterns();
-
-        if let Some(user_includes) = self.copy_patterns.include {
-            for pattern in user_includes {
-                if !merged_includes.contains(&pattern) {
-                    merged_includes.push(pattern);
-                }
-            }
-        }
-
-        if let Some(user_excludes) = self.copy_patterns.exclude {
-            for pattern in user_excludes {
-                if !merged_excludes.contains(&pattern) {
-                    merged_excludes.push(pattern);
-                }
-            }
-        }
-
         Self {
             copy_patterns: CopyPatterns {
-                include: Some(merged_includes),
-                exclude: Some(merged_excludes),
+                include: Some(Self::merge_patterns(
+                    Self::default_include_patterns(),
+                    self.copy_patterns.include,
+                )),
+                exclude: Some(Self::merge_patterns(
+                    Self::default_exclude_patterns(),
+                    self.copy_patterns.exclude,
+                )),
             },
             symlink_patterns: self.symlink_patterns,
             on_create: self.on_create,
+        }
+    }
+
+    /// Merges a user pattern list with the defaults.
+    fn merge_patterns(defaults: Vec<String>, user: Option<Vec<String>>) -> Vec<String> {
+        match user {
+            // An explicitly empty list replaces the defaults (opt-out).
+            Some(patterns) if patterns.is_empty() => Vec::new(),
+            // A non-empty list is merged additively on top of the defaults.
+            Some(patterns) => {
+                let mut merged = defaults;
+                for pattern in patterns {
+                    if !merged.contains(&pattern) {
+                        merged.push(pattern);
+                    }
+                }
+                merged
+            }
+            // No user input: use the defaults.
+            None => defaults,
         }
     }
 }

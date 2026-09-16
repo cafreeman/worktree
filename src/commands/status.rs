@@ -171,7 +171,7 @@ fn detect_config_drift(
         };
 
         for source_file in matches {
-            if create::should_exclude_file(&source_file, exclude_patterns)? {
+            if create::should_exclude_file(&source_file, repo_path, exclude_patterns)? {
                 continue;
             }
             if create::is_covered_by_symlink_pattern(&source_file, repo_path, symlink_patterns) {

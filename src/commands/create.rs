@@ -224,6 +224,7 @@ pub fn copy_config_files(
             for source_file in matches {
                 if should_exclude_file(
                     &source_file,
+                    source_path,
                     config.copy_patterns.exclude.as_deref().unwrap_or_default(),
                 )? {
                     continue;
@@ -377,20 +378,49 @@ pub(crate) fn find_matching_files(
     }
 }
 
-pub(crate) fn should_exclude_file(file_path: &Path, exclude_patterns: &[String]) -> Result<bool> {
-    let file_str = file_path.to_string_lossy();
+/// Checks whether a file path is excluded by any exclude pattern.
+///
+/// Matching is done against the path RELATIVE to the source root; the old
+/// substring match against the absolute path made a repo checked out under
+/// e.g. `~/dev/target/myrepo` exclude everything. Glob patterns match the
+/// relative path; plain patterns match the exact relative path, a
+/// directory prefix, or any single path segment.
+pub(crate) fn should_exclude_file(
+    file_path: &Path,
+    source_root: &Path,
+    exclude_patterns: &[String],
+) -> Result<bool> {
+    let Ok(relative) = file_path.strip_prefix(source_root) else {
+        return Ok(false);
+    };
+    let rel_str = relative.to_string_lossy();
 
     for pattern in exclude_patterns {
         if pattern.contains('*') {
-            if glob::Pattern::new(pattern)?.matches(&file_str) {
+            if glob::Pattern::new(pattern)?.matches(&rel_str) {
                 return Ok(true);
             }
-        } else if file_str.contains(pattern.as_str()) {
+        } else if plain_pattern_matches(&rel_str, pattern) {
             return Ok(true);
         }
     }
 
     Ok(false)
+}
+
+/// Matches a relative path against a plain (non-glob) pattern: exact path,
+/// directory prefix (`target` covers `target/anything`), or any single
+/// path segment equal to the pattern.
+fn plain_pattern_matches(rel: &str, pattern: &str) -> bool {
+    let normalized = pattern.trim_end_matches('/');
+
+    if rel == normalized {
+        return true;
+    }
+    if rel.starts_with(&format!("{normalized}/")) {
+        return true;
+    }
+    rel.split('/').any(|segment| segment == normalized)
 }
 
 fn copy_dir_recursive(source: &Path, target: &Path) -> Result<()> {
@@ -513,7 +543,15 @@ pub fn validate_branch_name_internal(input: &str) -> Validation {
         return Validation::Invalid("Branch name cannot be empty".into());
     }
 
+    if trimmed == "@" || trimmed.starts_with('-') {
+        return Validation::Invalid(
+            "Branch name is reserved or would be parsed as an option".into(),
+        );
+    }
+
     if input.contains("..")
+        || input.contains("//")
+        || input.contains("@{")
         || input.starts_with('/')
         || input.ends_with('/')
         || input.contains(' ')
@@ -611,6 +649,29 @@ pub fn interactive_create_with_feature(feature_name: &str) -> Result<()> {
     };
 
     create_worktree(feature_name, Some(&branch_name), from_ref.as_deref())?;
+
+    Ok(())
+}
+
+/// Interactive workflow when the feature name and `--from` reference are known
+/// but the branch is not: prompt for the branch and create it from the given
+/// starting point (no reference picker needed). The `--from` reference only
+/// applies when the branch is new; an existing branch is reused as-is.
+///
+/// # Errors
+/// Returns an error if interactive prompts fail or worktree creation fails.
+pub fn interactive_create_with_feature_and_from(feature_name: &str, from_ref: &str) -> Result<()> {
+    let provider = RealSelectionProvider;
+
+    WorktreeStorage::validate_feature_name(feature_name)?;
+
+    let prompt = format!(
+        "Starting branch name (new branches start from '{}'):",
+        from_ref
+    );
+    let branch_name = provider.get_text_input(&prompt, Some(validate_branch_name))?;
+
+    create_worktree(feature_name, Some(&branch_name), Some(from_ref))?;
 
     Ok(())
 }
@@ -867,5 +928,76 @@ mod tests {
         let config = WorktreeConfig::default();
         let result = run_on_create_hooks(&worktree, &config);
         assert!(result.is_ok());
+    }
+
+    // ── should_exclude_file ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_should_exclude_file_matches_relative_path_only() {
+        let base = Path::new("/home/user/dev/target/myrepo");
+
+        // Regression: the old substring match against the ABSOLUTE path
+        // excluded everything in repos under a directory like "target".
+        assert!(!should_exclude_file(&base.join(".env"), base, &["target/".to_string()]).unwrap());
+
+        // Directory prefix patterns exclude contents
+        assert!(
+            should_exclude_file(
+                &base.join("target/debug/app"),
+                base,
+                &["target/".to_string()]
+            )
+            .unwrap()
+        );
+        assert!(
+            !should_exclude_file(&base.join("src/main.rs"), base, &["target/".to_string()])
+                .unwrap()
+        );
+
+        // Glob patterns match the relative path
+        assert!(
+            should_exclude_file(&base.join("logs/debug.log"), base, &["*.log".to_string()])
+                .unwrap()
+        );
+
+        // Plain patterns match a segment anywhere
+        assert!(
+            should_exclude_file(
+                &base.join("src/build/output.js"),
+                base,
+                &["build".to_string()]
+            )
+            .unwrap()
+        );
+
+        // Paths outside the source root are never excluded
+        assert!(
+            !should_exclude_file(Path::new("/elsewhere/x.log"), base, &["*.log".to_string()])
+                .unwrap()
+        );
+    }
+
+    // ── validate_branch_name_internal ────────────────────────────────────────
+
+    #[test]
+    fn test_validate_branch_name_rejects_git_reserved_forms() {
+        assert!(matches!(
+            validate_branch_name_internal("main"),
+            Validation::Valid
+        ));
+        assert!(matches!(
+            validate_branch_name_internal("feature/auth"),
+            Validation::Valid
+        ));
+
+        for invalid in ["a//b", "a@{b", "@", "-opt", "a..b", "ends/"] {
+            assert!(
+                matches!(
+                    validate_branch_name_internal(invalid),
+                    Validation::Invalid(_)
+                ),
+                "branch name '{invalid}' should be rejected"
+            );
+        }
     }
 }

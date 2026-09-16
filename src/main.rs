@@ -23,11 +23,11 @@ enum Commands {
         /// Starting branch for the worktree (create new or use existing). If not provided, will prompt.
         #[arg(value_hint = ValueHint::Other)]
         branch: Option<String>,
-        /// Starting point for new branch (branch, commit, tag)
-        #[arg(long)]
+        /// Starting point for new branch (branch, commit, tag). Applies only when the branch is new
+        #[arg(long, requires = "feature_name")]
         from: Option<String>,
         /// Launch interactive selection for --from reference
-        #[arg(long)]
+        #[arg(long, requires = "feature_name", conflicts_with = "from")]
         interactive_from: bool,
         /// List available git references for completion (internal use)
         #[arg(long, hide = true)]
@@ -137,29 +137,18 @@ fn main() -> Result<()> {
                 (Some(feat), branch_arg, None, true) => {
                     create::interactive_from_selection(&feat, branch_arg.as_deref())?;
                 }
+                // Feature name and --from provided, no branch — prompt for
+                // the branch and create it from the given reference
+                (Some(feat), None, Some(from_ref), false) => {
+                    create::interactive_create_with_feature_and_from(&feat, &from_ref)?;
+                }
                 // Feature name provided, no branch — prompt for branch interactively
-                (Some(feat), None, _from_ref, false) => {
+                (Some(feat), None, None, false) => {
                     create::interactive_create_with_feature(&feat)?;
                 }
                 // Both feature name and branch provided
                 (Some(feat), Some(branch_arg), from_ref, false) => {
                     create::create_worktree(&feat, Some(&branch_arg), from_ref.as_deref())?;
-                }
-                // Invalid: --from without feature name
-                (None, _, Some(_), _) => {
-                    anyhow::bail!(
-                        "Cannot specify --from without a feature name. Use interactive mode instead."
-                    );
-                }
-                // Invalid: --interactive-from without feature name
-                (None, _, _, true) => {
-                    anyhow::bail!(
-                        "--interactive-from requires a feature name. Use interactive mode instead."
-                    );
-                }
-                // Feature + branch + from + interactive_from: use from ref
-                (Some(feat), Some(branch_arg), Some(from_ref), true) => {
-                    create::create_worktree(&feat, Some(&branch_arg), Some(&from_ref))?;
                 }
                 // Catch-all: invalid combinations
                 _ => {

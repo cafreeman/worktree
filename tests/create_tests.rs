@@ -112,6 +112,35 @@ fn test_create_worktree_smart_mode_existing_branch() -> Result<()> {
     Ok(())
 }
 
+/// --from requires a feature name (enforced by clap)
+#[test]
+fn test_create_from_requires_feature_name() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "--from", "main"])?
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ))
+        .stderr(predicate::str::contains("FEATURE_NAME"));
+
+    Ok(())
+}
+
+/// --interactive-from conflicts with --from (enforced by clap)
+#[test]
+fn test_create_interactive_from_conflicts_with_from() -> Result<()> {
+    let env = CliTestEnvironment::new()?;
+
+    env.run_command(&["create", "auth", "--interactive-from", "--from", "main"])?
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+
+    Ok(())
+}
+
 /// Test that creating a worktree does not mutate the origin repo's git config.
 /// Git config inheritance was removed: linked worktrees share the repo's
 /// config natively, and the old inheritance duplicated global gitconfig
