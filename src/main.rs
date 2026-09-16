@@ -48,6 +48,9 @@ enum Commands {
         /// Also delete the branch checked out in this worktree
         #[arg(long)]
         delete_branch: bool,
+        /// Delete the worktree even if it has uncommitted changes or unknown untracked files
+        #[arg(long)]
+        force: bool,
         /// Launch interactive selection mode
         #[arg(long)]
         interactive: bool,
@@ -172,6 +175,7 @@ fn main() -> Result<()> {
         Commands::Remove {
             target,
             delete_branch,
+            force,
             interactive,
             list_completions,
             current,
@@ -179,6 +183,7 @@ fn main() -> Result<()> {
             remove::remove_worktree(
                 target.as_deref(),
                 delete_branch,
+                force,
                 interactive,
                 list_completions,
                 current,

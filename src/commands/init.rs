@@ -127,7 +127,7 @@ _worktree_complete() {{
         # Complete remove command
         if [[ "$cur" == -* ]]; then
             # Complete flags for remove
-            COMPREPLY=($(compgen -W "--interactive --current --delete-branch --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--interactive --current --delete-branch --force --help" -- "$cur"))
         else
             # Complete worktree names
             local worktrees=$(worktree-bin remove --list-completions 2>/dev/null)
@@ -360,6 +360,7 @@ _worktree() {{
                     '--interactive[Launch interactive selection mode]' \
                     '--current[Current repo only]' \
                     '--delete-branch[Also delete the branch checked out in this worktree]' \
+                    '--force[Delete even if the worktree has uncommitted work]' \
                     '--help[Print help]' \
                     '-h[Print help]'
                 return 0
