@@ -15,6 +15,10 @@ Each worktree is identified by a **feature name** — a short, memorable label y
 - **Seamless Navigation** - Jump between worktrees instantly with interactive selection
 - **Perfect for LLM Workflows** - Work on multiple features simultaneously without losing context
 
+> **Platform support:** `worktree` currently supports Unix platforms, including
+> macOS and Linux. Windows is not supported because shell integration and the
+> companion skill rely on Unix directory symlinks.
+
 ## Installation
 
 ### 1. Install the Binary

@@ -37,6 +37,9 @@
 //! - [`selection`] - Abstracts interactive selection prompts for testability
 //! - [`traits`] - Defines GitOperations trait for testability and abstraction
 
+#[cfg(windows)]
+compile_error!("worktree currently supports Unix platforms only");
+
 pub mod commands;
 pub mod config;
 pub mod git;

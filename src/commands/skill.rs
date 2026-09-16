@@ -93,21 +93,9 @@ pub fn install_skill() -> Result<()> {
         if parent.exists() {
             if link.exists() || link.is_symlink() {
                 // Remove stale or existing symlink before recreating
-                #[cfg(unix)]
                 fs::remove_file(&link)?;
-                #[cfg(not(unix))]
-                fs::remove_dir(&link).or_else(|_| fs::remove_file(&link))?;
             }
-            #[cfg(unix)]
             std::os::unix::fs::symlink(&dir, &link)?;
-            #[cfg(not(unix))]
-            {
-                // Windows: create a directory junction or copy
-                bail!(
-                    "Symlink creation is not supported on this platform. The skill is installed at {} but you will need to manually link it to your agent's skill directory.",
-                    dir.display()
-                );
-            }
             println!("🔗 Symlink created at {}", link.display());
         } else {
             println!(
@@ -140,10 +128,7 @@ pub fn uninstall_skill() -> Result<()> {
     }
 
     if link.exists() || link.is_symlink() {
-        #[cfg(unix)]
         fs::remove_file(&link)?;
-        #[cfg(not(unix))]
-        fs::remove_dir(&link).or_else(|_| fs::remove_file(&link))?;
         println!("🗑️  Removed symlink at {}", link.display());
         removed_any = true;
     }
