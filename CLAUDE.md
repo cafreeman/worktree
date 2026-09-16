@@ -52,7 +52,7 @@ cargo run -- <command>
 ### Module Structure
 - **main.rs**: CLI entry point using clap for argument parsing, dispatches to command modules
 - **lib.rs**: Library crate root, exposes all modules and the main `Result` type from anyhow
-- **commands/**: Individual command implementations (create, list, remove, status, sync, init, jump, back, cleanup)
+- **commands/**: Individual command implementations (create, list, remove, status, sync, init, jump, back, cleanup, doctor)
 - **storage/**: Manages worktree storage in `~/.worktrees/<repo>/<feature-name>/` with feature name validation and origin tracking
 - **config/**: Handles `.worktree-config.toml` files for customizing copy patterns, symlink patterns, and on-create hooks
 - **git/**: Git operations wrapper using git2 crate, implements GitOperations trait
@@ -63,6 +63,7 @@ cargo run -- <command>
 - **Centralized storage**: All worktrees stored under `~/.worktrees/` with predictable structure (no custom paths)
 - **Feature-name-as-identity**: Worktrees are identified by a user-supplied feature name (the directory name), decoupled from the branch name. No branch name sanitization or mapping is performed.
 - **Configuration-driven file management**: Uses glob patterns from `.worktree-config.toml` for copying, symlinking, and post-create hooks; falls back to sensible defaults
+- **One-off links**: `create --link <pattern>` adds symlink patterns for one worktree without changing repository config
 - **Origin tracking**: Stores origin repository paths for back navigation in `.worktree-origins` metadata files
 - **Shell integration**: Generates shell functions for directory navigation and completions
 
@@ -82,7 +83,7 @@ Strict linting is enforced with:
 - `unwrap_used = "deny"` and `panic = "deny"` to prevent runtime panics
 - Performance lints for efficient code
 - Documentation requirements for error handling
-- MSRV set to 1.70.0
+- MSRV set to 1.85.0 (required by Rust edition 2024 and the crate's configured APIs)
 
 The codebase prioritizes safety, error handling, and maintainability with comprehensive error documentation and trait-based design for testability.
 
@@ -100,9 +101,9 @@ The project uses `cargo-release` for automated version management and release pr
 
 ### Safety Features
 - Manual initiation only - releases must be explicitly triggered by maintainer
-- Pre-release hooks run quality checks (fmt, clippy, test, build)
-- Automatic git tagging and pushing
-- Automatic publishing to crates.io once initiated
+- Pre-release checks are run manually before `cargo release` (see `release.toml`)
+- The release config creates tags and pushes only when the maintainer explicitly runs it
+- Publishing is disabled in `release.toml`; run `cargo publish` separately if desired
 
 ### Release Process
 When ready to publish a new version:
@@ -110,12 +111,8 @@ When ready to publish a new version:
 # Update CHANGELOG.md first, then run:
 cargo release patch  # or minor/major
 
-# This will automatically:
-# 1. Update version in Cargo.toml
-# 2. Run quality checks (fmt, clippy, test, build)  
-# 3. Create release commit and git tag
-# 4. Push to git remote
-# 5. Publish to crates.io
+# This updates the version, creates the release commit and tag, and pushes
+# according to release.toml. It does not publish to crates.io.
 ```
 - Clean up any stray files, directories, or git branches that you create while testing
 - Never release this package on your own

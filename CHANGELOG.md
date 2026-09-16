@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`worktree doctor`:** Reports missing, stale, malformed, duplicate, and
+  colliding origin metadata, unregistered worktrees, and configuration drift.
+  `--fix` repairs origin metadata only.
+- **Machine-readable output:** `worktree list --json` and
+  `worktree status --json` expose structured worktree state.
+- **One-off symlinks:** Repeatable `create --link <pattern>` adds symlinks for
+  one worktree without changing `.worktree-config.toml`.
+
+### Changed
+
+- **Agent-oriented defaults:** Copy defaults now include common MCP and local
+  coding-agent state, while excluding `.venv/`, `dist/`, and `build/`.
+- **Explicit configuration opt-out:** Empty `include` and `exclude` arrays now
+  replace built-in defaults instead of merging with them.
+- **Unix-only support:** Shell integration and the companion skill now declare
+  Unix platform support explicitly.
+- **Safer removal and diagnostics:** `remove` protects tracked/user files
+  unless `--force` is supplied, and `status` reports real Git worktree paths.
+
 ## [0.6.0] - 2026-07-24
 
 ### Added

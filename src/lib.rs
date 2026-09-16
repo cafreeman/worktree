@@ -5,12 +5,15 @@
 //!
 //! ## Features
 //!
-//! - **Centralized Storage** - Organizes worktrees in `~/.worktrees/<repo-name>/<branch-name>/`
+//! - **Centralized Storage** - Organizes worktrees in `~/.worktrees/<repo-name>/<feature-name>/`
 //! - **Smart Config Management** - Automatically copies gitignored config files to new worktrees
 //! - **Branch Synchronization** - Keeps worktrees and git branches in sync
 //! - **Comprehensive Status** - Shows detailed worktree and branch status
 //! - **Configurable Patterns** - Customize which files to copy via `.worktree-config.toml`
-//! - **Safe Branch Names** - Automatically sanitizes branch names with slashes and special characters
+//! - **Agent-Friendly Diagnostics** - Inspect and repair metadata with `worktree doctor`
+//!
+//! The companion skill and shell integration currently support Unix platforms,
+//! including macOS and Linux.
 //!
 //! ## Quick Start
 //!
@@ -31,7 +34,7 @@
 //! ## Module Structure
 //!
 //! - [`commands`] - Individual command implementations (create, list, remove, status, etc.)
-//! - [`storage`] - Manages worktree storage in `~/.worktrees/` with branch name sanitization
+//! - [`storage`] - Manages worktree storage in `~/.worktrees/` with feature-name validation
 //! - [`config`] - Handles `.worktree-config.toml` files for customizing file copy patterns
 //! - [`git`] - Git operations wrapper using git2 crate
 //! - [`selection`] - Abstracts interactive selection prompts for testability

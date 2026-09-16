@@ -31,6 +31,11 @@ cargo install worktree
 
 **Important:** The `worktree` command is a shell function that wraps `worktree-bin` to enable directory changing and provides enhanced tab completions automatically. Without this integration, `worktree jump`/`worktree switch` and `worktree back` won't be able to change your current directory.
 
+`worktree-bin` is the Rust executable; `worktree` is the shell function it
+generates. Keep them from the same release. After upgrading the binary,
+re-evaluate the shell integration and run `worktree skill update` when the
+installed skill reports an update.
+
 Add the following to your shell configuration:
 
 #### Bash
@@ -83,7 +88,22 @@ worktree skill uninstall  # Remove if no longer needed
 | `sync [from] [to]`             | Sync config files and symlinks; broadcasts origin → all worktrees of the repo if no args given, or between a specific pair if both given |
 | `back`                         | Return to the original repository                              |
 | `cleanup`                      | Clean up orphaned worktree references                          |
+| `doctor`                       | Diagnose storage, metadata, and configuration drift            |
 | `skill <install\|uninstall\|update\|status>` | Manage the companion agent skill             |
+
+Useful machine- and agent-oriented flags:
+
+```bash
+worktree create agent-task feature/agent-task --link .mcp.json
+worktree create agent-task feature/agent-task --link .claude/skills/ --link .mcp.json
+worktree list --json
+worktree status --json
+worktree remove agent-task --force
+```
+
+`--link` is repeatable and applies only to that creation. `--force` bypasses
+the safety check for tracked changes or unknown user files, so review the
+worktree before using it.
 
 ## Interactive Features
 
@@ -238,7 +258,8 @@ commands = [
 
 ### Flexible Configuration Options
 
-You can specify only the patterns you want to customize. Your configuration merges with defaults using precedence rules:
+You can specify only the patterns you want to customize. Non-empty lists
+merge with defaults using precedence rules:
 
 ```toml
 # Add custom includes (merges with defaults)
@@ -254,12 +275,18 @@ exclude = [".vscode/"]
 
 Your choices always override the defaults when there's a conflict.
 
+An explicitly empty list replaces the defaults for that setting. For example,
+`include = []` disables all built-in copying, while `exclude = []` disables
+all built-in exclusions.
+
 ### Default Patterns
 
 If no config file exists, these patterns are used:
 
-- **Included**: `.env*`, `.vscode/`, `*.local.json`, `config/local/*`
-- **Excluded**: `node_modules/`, `target/`, `.git/`, `*.log`, `*.tmp`
+- **Included**: `.env*`, `.vscode/`, `*.local.json`, `config/local/*`,
+  `.mcp.json`, `.claude/settings.local.json`, `.cursor/`, `.codex/`
+- **Excluded**: `node_modules/`, `target/`, `.git/`, `*.log`, `*.tmp`,
+  `.venv/`, `dist/`, `build/`
 
 ## Advanced Features
 
@@ -280,6 +307,38 @@ worktree sync ~/.worktrees/my-project/auth ~/.worktrees/my-project/payments
 
 `worktree status` reports any worktree whose config or symlinks have drifted from
 what `.worktree-config.toml` expects, and suggests running `worktree sync` to fix it.
+
+Use `--json` with `list` or `status` for machine-readable output:
+
+```bash
+worktree list --json
+worktree status --json
+```
+
+### Diagnostics
+
+`worktree doctor` checks origin metadata, repository-name collisions,
+unregistered worktree directories, and configuration drift. It is report-only
+by default. `--fix` repairs origin metadata only; it does not remove
+directories or change Git worktree registrations.
+
+```bash
+worktree doctor
+worktree doctor --fix
+```
+
+### One-off symlinks
+
+Add repeatable symlink patterns for one worktree without editing
+`.worktree-config.toml`:
+
+```bash
+worktree create agent-task feature/agent-task \
+  --link .claude/skills/ \
+  --link .mcp.json
+```
+
+One-off links take precedence over copy patterns for that creation.
 
 ### Cleanup Operations
 

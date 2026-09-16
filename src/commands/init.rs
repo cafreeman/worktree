@@ -168,7 +168,7 @@ _worktree_complete() {{
             fi
         elif [[ "$cur" == -* ]] || [ "${{#COMP_WORDS[@]}}" -eq 2 ]; then
             # Complete flags for create command (when typing flags or at the beginning)
-            COMPREPLY=($(compgen -W "--from --interactive-from --help" -- "$cur"))
+            COMPREPLY=($(compgen -W "--from --interactive-from --link --help" -- "$cur"))
         fi
     else
         # For all other commands, delegate to clap completion if available
@@ -180,7 +180,7 @@ _worktree_complete() {{
             COMP_WORDS=("${{saved_comp_words[@]}}")
         else
             # Fallback to basic completion
-            COMPREPLY=($(compgen -W "create list ls remove status sync jump switch back init completions cleanup --help --version" -- "$cur"))
+            COMPREPLY=($(compgen -W "create list ls remove status sync jump switch back init completions cleanup doctor --help --version" -- "$cur"))
         fi
     fi
 }}
@@ -371,6 +371,7 @@ _worktree() {{
             _arguments -s : \
                 '--from=[Starting point for new branch]:FROM:_worktree_git_refs_fallback' \
                 '--interactive-from[Launch interactive selection for --from reference]' \
+                '*--link=[Add a one-off symlink pattern]' \
                 '--help[Print help]' \
                 '-h[Print help]' \
                 ':feature-name -- Feature name for the worktree (used as directory name):' \
@@ -404,6 +405,7 @@ _worktree() {{
                         'init:Generate shell integration'
                         'completions:Generate shell completions'
                         'cleanup:Clean up orphaned branches and worktree references'
+                        'doctor:Diagnose storage and metadata'
                     )
                     _describe 'worktree commands' subcommands
                     return 0

@@ -22,7 +22,8 @@ sign-tag = false
 # Release commit message
 pre-release-commit-message = "Release v{{version}}"
 
-publish = true
+# Publishing remains a separate explicit maintainer action.
+publish = false
 
 # Verify the contents look right before any operations
 verify = true

@@ -2,6 +2,7 @@
 name = "worktree"
 version = "0.6.0"
 edition = "2024"
+rust-version = "1.85"
 description = "A powerful CLI tool for managing git worktrees with enhanced features including centralized storage, automatic config file synchronization, and intelligent branch management"
 license = "MIT"
 repository = "https://github.com/cafreeman/worktree"
